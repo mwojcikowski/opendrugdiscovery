@@ -34,6 +34,8 @@ def close_contact(mol1_atoms, mol2_atoms, cuttoff):
     """
     
     # !!! FIX: change to pure numpy implementation, but distance must support nested atom coordinates
+    #return np.sum(distance(mol2_atoms, mol1_atoms) < cutoff, axis=-1)
+    
     # !!! FIX 2: check if scipy.spatial.KDTree performs well, otherwise leave numpy alone
     f = []
     for mol2_num in range(mol1_atoms.shape[0]):
