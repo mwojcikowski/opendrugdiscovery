@@ -1,5 +1,16 @@
 import numpy as np
-from scipy.spatial.distance import cdist as distance
+from scipy.spatial.distance import cdist
+
+def distance(a,b):
+    # catch nested coordinates of shape (k-groups, n-atoms, m-dim)
+    if len(a.shape) == 3:
+        return np.sqrt((b[:,np.newaxis,:,0] - a[:, :, 0, np.newaxis])**2 + (b[:, np.newaxis,:,1] - a[:, :, 1, np.newaxis])**2 + (b[:, np.newaxis, :,2] - a[:, :, 2, np.newaxis])**2)
+    # otherwise simple group of atom coordinates of shape (n-atoms, m-dim)
+    else:
+        # numpy fastest solution (slower than scipy.spatial.distance.cdist)
+        #return np.sqrt(((b[:,0] - a[:,0, np.newaxis])**2 + (b[:,1] - a[:,1, np.newaxis])**2 + (b[:,2] - a[:,2, np.newaxis])**2))
+        # scipy
+        return cdist(a,b)
 
 class Molecule
 """ Class which holds dictionaries aiding descriptors calculation """
@@ -35,13 +46,13 @@ def close_contact(mol1_atoms, mol2_atoms, cuttoff):
     
     # !!! FIX: change to pure numpy implementation, but distance must support nested atom coordinates
     #return np.sum(distance(mol2_atoms, mol1_atoms) < cutoff, axis=-1)
-    
+    return np.sum(distance(mol2_atoms, mol1_atoms) < cutoff, axis=(-1,-2)).flatten()
     # !!! FIX 2: check if scipy.spatial.KDTree performs well, otherwise leave numpy alone
-    f = []
-    for mol2_num in range(mol1_atoms.shape[0]):
-            for mol1_num in range(mol1_atoms.shape[0]):
-                    if len(mol2_atoms[mol2_num]) > 0 and len(mol1_atoms[mol1_num]) > 0:
-                            f.append(np.sum(distance(mol2_atoms[mol2_num], mol1_atoms[mol1_num]) < cutoff))
-                    else:
-                            f.append(0)
-    return f
+#    f = []
+#    for mol2_num in range(mol1_atoms.shape[0]):
+#            for mol1_num in range(mol1_atoms.shape[0]):
+#                    if len(mol2_atoms[mol2_num]) > 0 and len(mol1_atoms[mol1_num]) > 0:
+#                            f.append(np.sum(distance(mol2_atoms[mol2_num], mol1_atoms[mol1_num]) < cutoff))
+#                    else:
+#                            f.append(0)
+#    return f

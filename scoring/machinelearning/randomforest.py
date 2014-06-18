@@ -9,9 +9,4 @@ class randomforest:
     
     def score(self, input_descriptors):
          self.model.predict(input_descriptors)
-         
-    def debug():
-    
-    def performance():
-        
     
