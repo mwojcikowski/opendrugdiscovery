@@ -1,6 +1,8 @@
 import numpy as np
 from scipy.spatial.distance import cdist
 
+from scipy.spatial import cKDTree as kdtree
+
 def distance(a,b):
     # catch nested (ligands + atomic number groups) coordinates of shape (m-ligands, k-groups, n-atoms, m-dim)
     if len(a.shape) == 3 and len(b.shape) == 4:
@@ -37,7 +39,7 @@ class Molecule:
                    mol_atoms[atom.atomicnum].append(atom.coords)
         for a in atomic_nums:
             if len(mol_atoms[a]) > 0:
-                mol_atoms[a] = np.array(mol_atoms[a])
+                mol_atoms[a] = kdtree(np.array(mol_atoms[a]), 10)
             else:
                 mol_atoms[a] = None
         return mol_atoms
@@ -53,7 +55,7 @@ def close_contact(mol1_atoms, mol2_atoms, cutoff):
     for mol2_a in sorted(mol2_atoms.keys()):
         for mol1_a in sorted(mol1_atoms.keys()):
             if mol1_atoms[mol1_a] and mol2_atoms[mol2_a]:
-                desc.append(np.sum(cdist(mol1_atoms[mol1_a], mol2_atoms[mol2_a]) < cutoff))
+                desc.append(mol1_atoms[mol1_a].count_neighbors(mol2_atoms[mol2_a], cutoff))
             else:
                 desc.append(0)
     
