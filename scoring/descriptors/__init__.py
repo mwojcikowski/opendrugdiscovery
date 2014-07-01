@@ -29,16 +29,22 @@ class Molecule:
         
         atomic nums: array of atomic numbers to compute the dictionary 
         """
-        
+        mol_atoms = {}
         for a in atomic_nums:
-        
-        # define dictionaries
-        mol_atoms = np.empty((len(atomic_nums), len(self.m.atoms),3))
-        mol_atoms.fill(np.nan)
-        # iterate through atoms
+            mol_atoms[a] = []
         for atom in self.m:
             if atom.atomicnum in atomic_nums:
-                    mol_atoms[atomic_nums.index(atom.atomicnum)][atom.idx-1] = atom.coords
+                   mol_atoms[atom.atomicnum].append(atom.coords)
+        for a in atomic_nums:
+            mol_atoms[a] = np.array(mol_atoms[a])
+        
+#        # define dictionaries
+#        mol_atoms = np.empty((len(atomic_nums), len(self.m.atoms),3))
+#        mol_atoms.fill(np.nan)
+#        # iterate through atoms
+#        for atom in self.m:
+#            if atom.atomicnum in atomic_nums:
+#                    mol_atoms[atomic_nums.index(atom.atomicnum)][atom.idx-1] = atom.coords
         return mol_atoms
 
 
@@ -51,13 +57,20 @@ def close_contact(mol1_atoms, mol2_atoms, cutoff):
     
     # !!! FIX: change to pure numpy implementation, but distance must support nested atom coordinates
     #return np.sum(distance(mol2_atoms, mol1_atoms) < cutoff, axis=-1)
-    return np.sum(distance(mol1_atoms, mol2_atoms) < cutoff, axis=(-1,-2))
+    
     # !!! FIX 2: check if scipy.spatial.KDTree performs well, otherwise leave numpy alone
-#    f = []
-#    for mol2_num in range(mol1_atoms.shape[0]):
-#            for mol1_num in range(mol1_atoms.shape[0]):
-#                    if len(mol2_atoms[mol2_num]) > 0 and len(mol1_atoms[mol1_num]) > 0:
-#                            f.append(np.sum(distance(mol2_atoms[mol2_num], mol1_atoms[mol1_num]) < cutoff))
-#                    else:
-#                            f.append(0)
-#    return f
+    
+    
+    
+    desc = []
+    for mol2_a in sorted(mol2_atoms.keys()):
+        for mol1_a in sorted(mol1_atoms.keys()):
+            if len(mol1_atoms[mol1_a]) > 0 and len(mol2_atoms[mol2_a]):
+                desc.append(np.sum(cdist(mol1_atoms[mol1_a], mol2_atoms[mol2_a]) < cutoff))
+            else:
+                desc.append(0)
+    
+    return np.array(desc)
+    
+    #return np.sum(distance(mol1_atoms, mol2_atoms) < cutoff, axis=(-1,-2))
+    

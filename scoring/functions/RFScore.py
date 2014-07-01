@@ -51,7 +51,7 @@ def prepare():
         desc = close_contact(protein.coordinate_dict(protein_atomic_num), ligand.coordinate_dict(ligand_atomic_num), cutoff).flatten()
         train_set = np.vstack((train_set, np.append(act, desc)))
     np.savetxt('RF-Score_descriptors.csv', train_set[1:], delimiter=',', fmt='%s')
-    print train_set[:,1:]
+    print train_set[1:,1:]
     
 #def validate():
 
