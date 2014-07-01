@@ -7,6 +7,6 @@ class randomforest:
     def train(self, input_descriptors, target_values):
         self.model.fit(input_descriptors, target_values)
     
-    def score(self, input_descriptors):
-         self.model.predict(input_descriptors)
+    def predict(self, input_descriptors):
+         return self.model.predict(input_descriptors)
     
