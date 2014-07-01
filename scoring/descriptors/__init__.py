@@ -39,7 +39,7 @@ class Molecule:
             if len(mol_atoms[a]) > 0:
                 mol_atoms[a] = np.array(mol_atoms[a])
             else:
-                mol_atoms[a] = None
+                mol_atoms[a] = np.array([])
         return mol_atoms
 
 
@@ -52,7 +52,7 @@ def close_contact(mol1_atoms, mol2_atoms, cutoff):
     desc = []
     for mol2_a in sorted(mol2_atoms.keys()):
         for mol1_a in sorted(mol1_atoms.keys()):
-            if mol1_atoms[mol1_a] and mol2_atoms[mol2_a]:
+            if len(mol1_atoms[mol1_a])> 0 and len(mol2_atoms[mol2_a]) > 0:
                 desc.append(np.sum(cdist(mol1_atoms[mol1_a], mol2_atoms[mol2_a]) < cutoff))
             else:
                 desc.append(0)
