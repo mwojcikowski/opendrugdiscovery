@@ -29,7 +29,7 @@ def score(protein_file, ligand_file, protein_file_type='pdb', ligand_file_type='
     for lig in pybel.readfile(ligand_file_type, ligand_file):
         ligand = Molecule(lig)
         #print lig.title
-        desc = close_contact(protein.coordinate_dict(protein_atomic_num), ligand.coordinate_dict(ligand_atomic_num), cutoff).flatten()
+        desc = close_contact(protein.coordinate_dict(protein.atom_dict_atomicnum(protein_atomic_num)), ligand.coordinate_dict(ligand.atom_dict_atomicnum(ligand_atomic_num)), cutoff).flatten()
         descs = np.vstack((descs, desc))
     
     # build descriptors and score molecules
