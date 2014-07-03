@@ -16,7 +16,7 @@ pybel.ob.obErrorLog.StopLogging()
 def score(protein_file, ligand_file, protein_file_type='pdb', ligand_file_type='sdf', descriptors_file='RF-Score_descriptors.csv'):
     """ Calculate scoring function using ligands and protein """
     # build forest ####len(ligand_atomic_num)*len(protein_atomic_num)
-    nn = neuralnetwork((36, 5, 10, 1))
+    nn = neuralnetwork((36, 50, 10, 1))
     
     # train forest on prebuilt descriptors from PDBind 2007
     train_data = np.loadtxt(descriptors_file, delimiter=',')

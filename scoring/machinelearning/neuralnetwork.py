@@ -3,14 +3,14 @@ from ffnet import ffnet,mlgraph,tmlgraph
 import numpy as np
 
 class neuralnetwork:
-    def __init__(self, shape, full_conn=True):
+    def __init__(self, shape, full_conn=True, biases=False):
         """
         shape: shape of a NN given as a tuple
         """
         if full_conn:
-            conec = tmlgraph(shape)
+            conec = tmlgraph(shape, biases)
         else:
-            conec = mlgraph(shape)
+            conec = mlgraph(shapebiases)
         self.model = ffnet(conec)
     
     def train(self, input_descriptors, target_values, train_alg='tnc'):
