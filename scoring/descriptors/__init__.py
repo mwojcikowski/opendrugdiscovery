@@ -6,6 +6,7 @@ class Molecule:
     def __init__(self, mol):
         """ mol: pybel molecule """
         self.m = mol
+        self.coords = np.array([atom.coord for atom in mol])
     
     def coordinate_dict(self, atomic_nums):
         """
@@ -25,8 +26,72 @@ class Molecule:
             else:
                 mol_atoms[a] = np.array([])
         return mol_atoms
-
-
+    
+    def atom_dict_atomicnum(atomic_nums):
+        """
+        Get dictionary of atom indicies, based on given atom types
+        """
+        mol_atoms = {}
+        for a in atomic_nums:
+            mol_atoms[a] = []
+        for atom in self.m:
+            if atom.atomicnum in atomic_nums:
+                   mol_atoms[atom.atomicnum].append(atom.idx)
+    
+    def atom_dict_types(types, mode='ad4'):
+        """
+        Get dictionary of atom indicies, based on given atom types
+        types: an array of types as strings
+        mode: which types to use (ad4, sybyl)
+        """
+        mol_atoms = {}
+        for t in types:
+            mol_atoms[t] = []
+        if mode == 'ad4': # AutoDock4 types http://autodock.scripps.edu/faqs-help/faq/where-do-i-set-the-autodock-4-force-field-parameters
+            for atom in self.mol:
+                # A
+                if atom.type == 'Car' and 'A' in types:
+                    mol_atoms['A'].append(atom.coords)
+                # C
+                elif atom.atomicnum == 6 and 'C' in types:
+                    mol_atoms['C'].append(atom.coords)
+                # CL
+                elif atom.atomicnum == 17 and 'CL' in types:
+                    mol_atoms['CL'].append(atom.coords)
+                # F
+                elif atom.atomicnum == 9 and 'F' in types:
+                    mol_atoms['F'].append(atom.coords)
+                # FE
+                elif atom.atomicnum == 26 and 'FE' in types:
+                    mol_atoms['FE'].append(atom.coords)
+                # HD
+                elif atom.atomicnum == 1 and 'HD' in types and atom.OBAtom.IsHbondDonorH():
+                    mol_atoms['HD'].append(atom.coords)
+                # MG
+                elif atom.atomicnum == 12 and 'MG' in types:
+                    mol_atoms['MG'].append(atom.coords)
+                # MN
+                elif atom.atomicnum == 12 and 'MN' in types:
+                    mol_atoms['MN'].append(atom.coords)
+                # NA
+                elif atom.atomicnum == 7 and 'NA' in types and atom.OBAtom.IsHbondAcceptor():
+                    mol_atoms['NA'].append(atom.coords)
+                # N
+                elif atom.atomicnum == 7 and 'N' in types:
+                    mol_atoms['N'].append(atom.coords)
+                # OA
+                elif atom.atomicnum == 8 and 'OA' in types and atom.OBAtom.IsHbondAcceptor():
+                    mol_atoms['OA'].append(atom.coords)
+                # SA
+                elif atom.atomicnum == 16 and 'SA' in types and atom.OBAtom.IsHbondAcceptor():
+                    mol_atoms['SA'].append(atom.coords)
+                # ZN
+                elif atom.atomicnum == 30 and 'ZN' in types:
+                    mol_atoms['ZN'].append(atom.coords)
+                    
+                    
+                    
+                    
 # DESCRIPTORS
 
 def close_contact(mol1_atoms, mol2_atoms, cutoff):
