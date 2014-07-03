@@ -5,40 +5,47 @@ class Molecule:
     """ Class which holds dictionaries aiding descriptors calculation """
     def __init__(self, mol):
         """ mol: pybel molecule """
-        self.m = mol
-        self.coords = np.array([atom.coords for atom in mol])
+        self.mol = mol
+        self._coords = None
+        self._charges = None
     
-    def coordinate_dict(self, atomic_nums):
+    # lazyload properties and cache them in prefixed [_] variables
+    @property
+    def coords(self):
+        if self._coords is None:
+            self._coords = np.array([atom.coords for atom in self.mol])
+        return self._coords
+    
+    @property
+    def charges(self):
+        if self._charges is None:
+            self._charges = np.array([atom.partialcharge for atom in self.mol])
+        return self._charges
+    
+    def coordinate_dict(self, indx_dict):
         """
-        Returns vector of atomic coordinates of atoms with atomic number = atomic_num in given molecule 
+        Returns vector of atomic coordinates of atoms given by indicies in dictionary 
         
         atomic nums: array of atomic numbers to compute the dictionary 
         """
         mol_atoms = {}
-        for a in atomic_nums:
-            mol_atoms[a] = []
-        for atom in self.m:
-            if atom.atomicnum in atomic_nums:
-                   mol_atoms[atom.atomicnum].append(atom.coords)
-        for a in atomic_nums:
-            if len(mol_atoms[a]) > 0:
-                mol_atoms[a] = np.array(mol_atoms[a])
-            else:
-                mol_atoms[a] = np.array([])
+        for key in indx_dict.keys():
+            mol_atoms[key] = self.coords[np.array(indx_dict[key], dtype=np.int)-1]
         return mol_atoms
     
-    def atom_dict_atomicnum(atomic_nums):
+    def atom_dict_atomicnum(self, atomic_nums):
         """
         Get dictionary of atom indicies, based on given atom types
         """
         mol_atoms = {}
         for a in atomic_nums:
             mol_atoms[a] = []
-        for atom in self.m:
+        for atom in self.mol:
             if atom.atomicnum in atomic_nums:
                    mol_atoms[atom.atomicnum].append(atom.idx)
+        return mol_atoms
     
-    def atom_dict_types(types, mode='ad4'):
+    def atom_dict_types(self, types, mode='ad4'):
         """
         Get dictionary of atom indicies, based on given atom types
         types: an array of types as strings
