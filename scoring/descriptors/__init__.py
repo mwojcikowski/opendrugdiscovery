@@ -6,7 +6,7 @@ class Molecule:
     def __init__(self, mol):
         """ mol: pybel molecule """
         self.m = mol
-        self.coords = np.array([atom.coord for atom in mol])
+        self.coords = np.array([atom.coords for atom in mol])
     
     def coordinate_dict(self, atomic_nums):
         """
