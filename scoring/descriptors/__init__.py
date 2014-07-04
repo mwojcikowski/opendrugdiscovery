@@ -90,9 +90,15 @@ class Molecule:
                 # OA
                 elif atom.atomicnum == 8 and 'OA' in types and atom.OBAtom.IsHbondAcceptor():
                     mol_atoms['OA'].append(atom.coords)
+                # O
+                elif atom.atomicnum == 8 and 'O' in types:
+                    mol_atoms['O'].append(atom.coords)
                 # SA
                 elif atom.atomicnum == 16 and 'SA' in types and atom.OBAtom.IsHbondAcceptor():
                     mol_atoms['SA'].append(atom.coords)
+                # S
+                elif atom.atomicnum == 16 and 'S' in types:
+                    mol_atoms['S'].append(atom.coords)
                 # ZN
                 elif atom.atomicnum == 30 and 'ZN' in types:
                     mol_atoms['ZN'].append(atom.coords)
