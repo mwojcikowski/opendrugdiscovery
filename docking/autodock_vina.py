@@ -13,7 +13,7 @@ class autodock_vina:
         self.center = center
         # center automaticaly on ligand
         if auto_ligand:
-            self.center = tuple(np.array([atom.coords for atom in ligand], dtype=np.float16).mean(axis=0))
+            self.center = tuple(np.array([atom.coords for atom in auto_ligand], dtype=np.float16).mean(axis=0))
         # autodetect Vina executable
         if not executable:
             self.executable = subprocess.check_output(['which', 'vina']).split('\n')[0]
