@@ -48,6 +48,7 @@ class mol:
                  # residue info
                  ('resid', 'int16'),
                  ('resname', 'a3'),
+                 ('isbackbone', 'bool'),
                  # atom properties
                  ('isacceptor', 'bool'),
                  ('isdonor', 'bool'),
@@ -81,12 +82,13 @@ class mol:
                       # residue info
                       residue.idx,
                       residue.name,
+                      residue.OBResidue.GetAtomProperty(atom.OBAtom, 2), # is backbone
                       # atom properties
                       atom.OBAtom.IsHbondAcceptor(),
                       atom.OBAtom.IsHbondDonor(),
                       atom.OBAtom.IsHbondDonorH(),
                       atom.OBAtom.IsMetal(),
-                      False, #hydrophobe
+                      atom.atomicnum == 6 and np.in1d(neighbors['atomicnum'], [1,6]).all(), #hydrophobe
                       atom.OBAtom.IsAromatic(),
                       atom.type in ['O3-', '02-' 'O-'], # is charged (minus)
                       atom.type in ['N3+', 'N2+', 'Ng+'], # is charged (plus)
