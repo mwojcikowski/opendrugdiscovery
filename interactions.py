@@ -24,6 +24,75 @@ class mol:
         self.protein = protein
         self.dict()
         
+    def dict_numpy(self):
+        """ Pure numpy implementation of dicionaries using subsetting """
+        
+        molecule = self.mol
+
+        res_dtype = [('id', 'int16'),
+                     ('resname', 'a3')]
+
+        b = []
+        for residue in protein.residues:
+            b.append((residue.idx, residue.name))
+        res_dict = np.array(b, dtype=res_dtype)
+
+
+        atom_dtype = [('id', 'int16'),
+                 # atom info
+                 ('coords', 'float16', 3),
+                 ('charge', 'float16'),
+                 ('atomicnum', 'int8'),
+                 ('atomtype','a3'),
+                 ('neighbors',np.object_),
+                 # residue info
+                 ('resid', 'int16'),
+                 ('resname', 'a3'),
+                 # atom properties
+                 ('isacceptor', 'bool'),
+                 ('isdonor', 'bool'),
+                 ('isdonorh', 'bool'), # realy??
+                 ('ismetal', 'bool'),
+                 ('ishydrophobe', 'bool'),
+                 ('isaromatic', 'bool'),
+                 ('ischargedminus', 'bool'),
+                 ('ischargedplus', 'bool'),
+                 ('ishalogen', 'bool')
+                 ]
+
+        a = []
+        for atom in molecule:#ligands[1]:
+            residue = pybel.Residue(atom.OBAtom.GetResidue())
+            # get neighbors
+            neighbors = []
+            for nbr_atom in [pybel.Atom(x) for x in OBAtomAtomIter(atom.OBAtom)]:
+                neighbors.append((nbr_atom.idx,
+                                  nbr_atom.coords,
+                                  atom.atomicnum
+                                  ))
+            neighbors = np.array(neighbors, dtype=[('id', 'int16'),('coords', 'float16', 3),('atomicnum', 'int8')])
+
+            a.append((atom.idx,
+                      atom.coords,
+                      atom.partialcharge,
+                      atom.atomicnum,
+                      atom.type,
+                      neighbors,
+                      # residue info
+                      residue.idx,
+                      residue.name,
+                      # atom properties
+                      atom.OBAtom.IsHbondAcceptor(),
+                      atom.OBAtom.IsHbondDonor(),
+                      atom.OBAtom.IsHbondDonorH(),
+                      atom.OBAtom.IsMetal(),
+                      False, #hydrophobe
+                      atom.OBAtom.IsAromatic(),
+                      atom.type in ['O3-', '02-' 'O-'], # is charged (minus)
+                      atom.type in ['N3+', 'N2+', 'Ng+'], # is charged (plus)
+                      atom.atomicnum in [9,17,35,53]# is halogen?
+                      ))
+        mol_dict = np.array(a, dtype=atom_dtype)
         
     def dict(self):
         """ Generate dictionaries of atoms for molecule """
