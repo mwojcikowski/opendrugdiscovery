@@ -4,6 +4,7 @@ from os.path import exists
 import subprocess
 import numpy as np
 import re
+import pybel
 
 class autodock_vina:
     def __init__(self, protein, size=(10,10,10), center=(0,0,0), auto_ligand=None, exhaustivness=8, num_modes=9, energy_range=3, seed=None, prefix_dir='/tmp', ncpu=1, executable=None, autocleanup=True):
@@ -60,7 +61,8 @@ class autodock_vina:
             ligand_file = ligand_dir + '/' + str(n) + '.pdbqt'
             ligand_outfile = ligand_dir + '/' + str(n) + '_out.pdbqt'
             ligand.write('pdbqt', ligand_file, overwrite=True)
-            output_array.append(parse_vina_docking_output(subprocess.check_output([self.executable, '--receptor', self.protein_file, '--ligand', ligand_file, '--out', ligand_outfile] + self.params)))
+            vina = parse_vina_docking_output(subprocess.check_output([self.executable, '--receptor', self.protein_file, '--ligand', ligand_file, '--out', ligand_outfile] + self.params))
+            output_array.append(zip([lig for lig in pybel.readfile('pdbqt', ligand_outfile)], vina))
             n +=1
         return output_array
     
