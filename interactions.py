@@ -498,6 +498,17 @@ def dihedral(p1,p2,p3,p4):
     v12 = (p1-p2)/np.linalg.norm(p1-p2)
     v23 = (p2-p3)/np.linalg.norm(p2-p3)
     v34 = (p3-p4)/np.linalg.norm(p3-p4)
-    return angle(np.cross(v12, v23), np.cross(v23, v34))
+    c1 = np.cross(v12, v23)
+    c2 = np.cross(v23, v34)
+    out = angle(c1, c2)
+    # check clockwise and anti-
+    n1 = c1/np.linalg.norm(c1)
+    mask = (n1*v34).sum(axis=-1) > 0
+    if len(mask.shape) == 0:
+        if mask:
+            out = -out
+    else:
+        out[mask] = -out[mask]
+    return out
 
 
