@@ -8,7 +8,7 @@ import pybel
 
 class autodock_vina:
     def __init__(self, protein, size=(10,10,10), center=(0,0,0), auto_ligand=None, exhaustivness=8, num_modes=9, energy_range=3, seed=None, prefix_dir='/tmp', ncpu=1, executable=None, autocleanup=True):
-        self.dir = mkdtemp(dir = prefix_dir, prefix='autodock_vina_')
+        self.dir = prefix_dir,
         # define binding site
         self.size = size
         self.center = center
@@ -24,10 +24,9 @@ class autodock_vina:
         self.version = subprocess.check_output([self.executable, '--version']).split(' ')[2]
         self.autocleanup = autocleanup
         
+        # share protein to class
+        self.protein = protein
         
-        # write protein to file
-        self.protein_file = self.dir + '/protein.pdbqt'
-        protein.write('pdbqt', self.protein_file, opt={'r':None,})
         
         #pregenerate common Vina parameters
         self.params = []
@@ -41,40 +40,42 @@ class autodock_vina:
         self.params = self.params + ['--energy_range', str(energy_range)]
     
     def score(self, ligands):
+        tmp_dir = mkdtemp(dir = self.dir, prefix='autodock_vina_')
+        # write protein to file
+        protein_file = tmp_dir + '/protein.pdbqt'
+        self.protein.write('pdbqt', protein_file, opt={'r':None,})
+        
         output_array = []
         n = 1
-        ligand_dir = mkdtemp(dir = self.dir, prefix='ligands_')
+        ligand_dir = mkdtemp(dir = tmp_dir, prefix='ligands_')
         for ligand in ligands:
             # write ligand to file
             ligand_file = ligand_dir + '/' + str(n) + '.pdbqt'
             ligand.write('pdbqt', ligand_file, overwrite=True)
-            output_array.append(parse_vina_scoring_output(subprocess.check_output([self.executable, '--score_only', '--receptor', self.protein_file, '--ligand', ligand_file] + self.params)))
+            output_array.append(parse_vina_scoring_output(subprocess.check_output([self.executable, '--score_only', '--receptor', protein_file, '--ligand', ligand_file] + self.params)))
             n +=1
+        rmtree(tmp_dir)
         return output_array
             
     def dock(self, ligands):
+        tmp_dir = mkdtemp(dir = self.dir, prefix='autodock_vina_')
+        # write protein to file
+        protein_file = tmp_dir + '/protein.pdbqt'
+        self.protein.write('pdbqt', protein_file, opt={'r':None,})
+        
         output_array = []
         n = 1
-        ligand_dir = mkdtemp(dir = self.dir, prefix='ligands_')
+        ligand_dir = mkdtemp(dir = tmp_dir, prefix='ligands_')
         for ligand in ligands:
             # write ligand to file
             ligand_file = ligand_dir + '/' + str(n) + '.pdbqt'
             ligand_outfile = ligand_dir + '/' + str(n) + '_out.pdbqt'
             ligand.write('pdbqt', ligand_file, overwrite=True)
-            vina = parse_vina_docking_output(subprocess.check_output([self.executable, '--receptor', self.protein_file, '--ligand', ligand_file, '--out', ligand_outfile] + self.params))
+            vina = parse_vina_docking_output(subprocess.check_output([self.executable, '--receptor', protein_file, '--ligand', ligand_file, '--out', ligand_outfile] + self.params))
             output_array.append(zip([lig for lig in pybel.readfile('pdbqt', ligand_outfile)], vina))
             n +=1
+        rmtree(tmp_dir)
         return output_array
-    
-    
-    # !!! FIX: this does not delete directory for some reason
-    def __enter__(self):
-        return self
-    
-    def __exit__(self):
-        if exists(self.dir) and self.autocleanup:
-            rmtree(self.dir)
-            dasdsad
     
 def parse_vina_scoring_output(output):
     out = {}
