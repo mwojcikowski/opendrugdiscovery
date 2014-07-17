@@ -42,7 +42,6 @@ class Molecule:
                  # atom properties
                  ('isacceptor', 'bool'),
                  ('isdonor', 'bool'),
-                 ('isdonorh', 'bool'), # realy??
                  ('ismetal', 'bool'),
                  ('ishydrophobe', 'bool'),
                  ('isaromatic', 'bool'),
@@ -55,26 +54,33 @@ class Molecule:
                  ]
 
         a = []
+        #atom_dict = np.empty(molecule.OBMol.NumAtoms(), dtype=atom_dtype)
+        i = 0
         for atom in molecule:
+            # skip hydrogens for performance
+            if atom.atomicnum == 1:
+                continue
             if protein:
                 residue = pybel.Residue(atom.OBAtom.GetResidue())
             else:
                 residue = False
             
-            # get neighbors
+            # get neighbors, but only for those atoms which realy need them
             neighbors = []
-            for nbr_atom in [pybel.Atom(x) for x in OBAtomAtomIter(atom.OBAtom)]:
-                neighbors.append((nbr_atom.idx,
-                                  nbr_atom.coords,
-                                  nbr_atom.atomicnum
-                                  ))
-            neighbors = np.array(neighbors, dtype=[('id', 'int16'),('coords', 'float16', 3),('atomicnum', 'int8')])
             n_coords = np.empty((6,3), dtype='float16')
-            n_coords.fill(np.nan)
-            n_nonh = neighbors[neighbors['atomicnum']!=1]
-            if len(n_nonh) > 0:
-                n_coords[:len(n_nonh)] = n_nonh['coords']
-            a.append((atom.idx,
+            if atom.OBAtom.IsHbondAcceptor() or atom.OBAtom.IsHbondDonor():
+                for nbr_atom in [pybel.Atom(x) for x in OBAtomAtomIter(atom.OBAtom)]:
+                    neighbors.append((nbr_atom.idx,
+                                      nbr_atom.coords,
+                                      nbr_atom.atomicnum
+                                      ))
+                neighbors = np.array(neighbors, dtype=[('id', 'int16'),('coords', 'float16', 3),('atomicnum', 'int8')])
+                n_coords.fill(np.nan)
+                n_nonh = neighbors[neighbors['atomicnum']!=1]
+                if len(n_nonh) > 0:
+                    n_coords[:len(n_nonh)] = n_nonh['coords']
+            a.append(
+            (atom.idx,
                       atom.coords,
                       atom.partialcharge,
                       atom.atomicnum,
@@ -87,72 +93,77 @@ class Molecule:
                       # atom properties
                       atom.OBAtom.IsHbondAcceptor(),
                       atom.OBAtom.IsHbondDonor(),
-                      atom.OBAtom.IsHbondDonorH(),
                       atom.OBAtom.IsMetal(),
-                      atom.atomicnum == 6 and np.in1d(neighbors['atomicnum'], [1,6]).all(), #hydrophobe
+                      atom.atomicnum == 6 and len(neighbors) > 0 and ((neighbors['atomicnum'] != 1).any() or (neighbors['atomicnum'] != 6).any()), #hydrophobe
                       atom.OBAtom.IsAromatic(),
                       atom.type in ['O3-', '02-' 'O-'], # is charged (minus)
                       atom.type in ['N3+', 'N2+', 'Ng+'], # is charged (plus)
                       atom.atomicnum in [9,17,35,53], # is halogen?
                       False, # alpha
                       False # beta
-                      ))
+                      )
+            )
+            i +=1
         atom_dict = np.array(a, dtype=atom_dtype)
+        
+        if protein:
+            # Protein Residues (alpha helix and beta sheet)
+            res_dtype = [('id', 'int16'),
+                         ('resname', 'a3'),
+                         ('N', 'float16', 3),
+                         ('CA', 'float16', 3),
+                         ('C', 'float16', 3),
+                         ('isalpha', 'bool'),
+                         ('isbeta', 'bool')
+                         ] # N, CA, C
 
-        # Protein Residues (alpha helix and beta sheet)
-        res_dtype = [('id', 'int16'),
-                     ('resname', 'a3'),
-                     ('N', 'float16', 3),
-                     ('CA', 'float16', 3),
-                     ('C', 'float16', 3),
-                     ('isalpha', 'bool'),
-                     ('isbeta', 'bool')
-                     ] # N, CA, C
+            b = []
+            for residue in molecule.residues:
+                backbone = {}
+                for atom in residue:
+                    if residue.OBResidue.GetAtomProperty(atom.OBAtom,1):
+                        if atom.atomicnum == 7:
+                            backbone['N'] = atom.coords
+                        elif atom.atomicnum == 6:
+                            if atom.type == 'C3':
+                                backbone['CA'] = atom.coords
+                            else:
+                                backbone['C'] = atom.coords
+                if len(backbone.keys()) == 3:
+                    b.append((residue.idx, residue.name, backbone['N'],  backbone['CA'], backbone['C'], False, False))
+            res_dict = np.array(b, dtype=res_dtype)
+            
+            # detect secondary structure by phi and psi angles
+            first = res_dict[:-1]
+            second = res_dict[1:]
+            psi = dihedral(first['N'], first['CA'], first['C'], second['N'])
+            phi = dihedral(first['C'], second['N'], second['CA'], second['C'])
+            # mark atoms belonging to alpha and beta
+            res_mask_alpha = np.where(((phi > -145) & (phi < -35) & (psi > -70) & (psi < 50))) # alpha
+            res_dict['isalpha'][res_mask_alpha] = True
+            for i in res_dict[res_mask_alpha]['id']:
+                atom_dict['isalpha'][atom_dict['resid'] == i] = True
 
-        b = []
-        for residue in molecule.residues:
-            backbone = {}
-            for atom in residue:
-                if residue.OBResidue.GetAtomProperty(atom.OBAtom,1):
-                    if atom.atomicnum == 7:
-                        backbone['N'] = atom.coords
-                    elif atom.atomicnum == 6:
-                        if atom.type == 'C3':
-                            backbone['CA'] = atom.coords
-                        else:
-                            backbone['C'] = atom.coords
-            if len(backbone.keys()) == 3:
-                b.append((residue.idx, residue.name, backbone['N'],  backbone['CA'], backbone['C'], False, False))
-        res_dict = np.array(b, dtype=res_dtype)
-        # detect secondary structure by phi and psi angles
-        first = res_dict[:-1]
-        second = res_dict[1:]
-        psi = dihedral(first['N'], first['CA'], first['C'], second['N'])
-        phi = dihedral(first['C'], second['N'], second['CA'], second['C'])
-        # mark atoms belonging to alpha and beta
-        res_mask_alpha = np.where(((phi > -145) & (phi < -35) & (psi > -70) & (psi < 50))) # alpha
-        res_dict['isalpha'][res_mask_alpha] = True
-        atom_dict['isalpha'][np.in1d(atom_dict['resid'], res_dict[res_mask_alpha]['id'])] = True
+            res_mask_beta = np.where(((phi >= -180) & (phi < -40) & (psi <= 180) & (psi > 90)) | ((phi >= -180) & (phi < -70) & (psi <= -165))) # beta
+            res_dict['isbeta'][res_mask_beta] = True
+            atom_dict['isbeta'][np.in1d(atom_dict['resid'], res_dict[res_mask_beta]['id'])] = True
 
-        res_mask_beta = np.where(((phi >= -180) & (phi < -40) & (psi <= 180) & (psi > 90)) | ((phi >= -180) & (phi < -70) & (psi <= -165))) # beta
-        res_dict['isbeta'][res_mask_beta] = True
-        atom_dict['isbeta'][np.in1d(atom_dict['resid'], res_dict[res_mask_beta]['id'])] = True
-
-        # Rings
+        # Aromatic Rings
         r = []
         for ring in molecule.sssr:
             if ring.IsAromatic():
                 path = np.array(ring._path) # path of atom ID's (1-n)
-                coords = atom_dict[path-1]['coords']
+                coords = atom_dict[np.in1d(atom_dict['id'], path)]['coords']
                 centroid = coords.mean(axis=0)
                 # get vector perpendicular to ring
-                vector = np.cross(atom_dict[path-1]['coords'] - atom_dict[np.hstack((path[1:],path[0]))-1]['coords'],atom_dict[np.hstack((path[1:],path[0:1]))-1]['coords'] - atom_dict[np.hstack((path[2:],path[0:2]))-1]['coords']).mean(axis=0)
+                vector = np.cross(coords - np.vstack((coords[1:],coords[:1])), np.vstack((coords[1:],coords[:1])) - np.vstack((coords[2:],coords[:2])))
                 r.append((centroid, vector))
         ring_dict = np.array(r)
         
         self.atom_dict = atom_dict
-        self.res_dict = res_dict
         self.ring_dict = ring_dict
+        if protein:
+            self.res_dict = res_dict
 
 
 

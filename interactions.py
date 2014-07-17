@@ -414,14 +414,18 @@ def halogenbond(mol1, mol2):
     return h1 + h2, h1_crude + h2_crude
 
 
+def angle_3p(p1,p2,p3):
+    """ Return an angle from 3 points in cartesian space (point #2 is centroid) """
+    v1 = p1-p2
+    v2 = p3-p2
+    return angle(v1,v2)
+
 def angle(v1, v2):
     """ Return an angle between two vectors in degrees """
-    v1 = np.array(v1)
-    v2 = np.array(v2)
     dot = (v1*v2).sum(axis=-1) # better than np.dot(v1, v2), multiple vectors can be applied
     norm = np.linalg.norm(v1, axis=-1)* np.linalg.norm(v2, axis=-1)
-    return np.nan_to_num(np.degrees(np.arccos(dot/norm)))
-    
+    return np.degrees(np.arccos(dot/norm))
+
 def dihedral(p1,p2,p3,p4):
     """ Calculate dihedral from 4 points """
     v12 = (p1-p2)/np.linalg.norm(p1-p2)
