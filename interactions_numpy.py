@@ -1,8 +1,6 @@
-#/usr/bin/python
 import numpy as np
 from openbabel import OBAtomAtomIter
 from scipy.spatial.distance import cdist as distance
-#from sklearn.metrics.pairwise import euclidean_distances as distance
 import pybel
 
 # define cutoffs
@@ -20,6 +18,7 @@ pybel.ob.obErrorLog.StopLogging()
 
 class Molecule:
     def __init__(self, molecule, protein=False):
+        self.protein = protein
         #ob.DeterminePeptideBackbone(molecule.OBMol)
 
         # percieve chains in residues
@@ -45,8 +44,8 @@ class Molecule:
                  ('ismetal', 'bool'),
                  ('ishydrophobe', 'bool'),
                  ('isaromatic', 'bool'),
-                 ('ischargedminus', 'bool'),
-                 ('ischargedplus', 'bool'),
+                 ('isminus', 'bool'),
+                 ('isplus', 'bool'),
                  ('ishalogen', 'bool'),
                  # secondary structure
                  ('isalpha', 'bool'),
@@ -68,17 +67,18 @@ class Molecule:
             # get neighbors, but only for those atoms which realy need them
             neighbors = []
             n_coords = np.empty((6,3), dtype='float16')
-            if atom.OBAtom.IsHbondAcceptor() or atom.OBAtom.IsHbondDonor():
-                for nbr_atom in [pybel.Atom(x) for x in OBAtomAtomIter(atom.OBAtom)]:
-                    neighbors.append((nbr_atom.idx,
-                                      nbr_atom.coords,
-                                      nbr_atom.atomicnum
-                                      ))
-                neighbors = np.array(neighbors, dtype=[('id', 'int16'),('coords', 'float16', 3),('atomicnum', 'int8')])
-                n_coords.fill(np.nan)
-                n_nonh = neighbors[neighbors['atomicnum']!=1]
-                if len(n_nonh) > 0:
-                    n_coords[:len(n_nonh)] = n_nonh['coords']
+            for nbr_atom in [pybel.Atom(x) for x in OBAtomAtomIter(atom.OBAtom)]:
+                if nbr_atom.atomicnum == 1:
+                    continue
+                neighbors.append((nbr_atom.idx,
+                                  nbr_atom.coords,
+                                  nbr_atom.atomicnum
+                                  ))
+            neighbors = np.array(neighbors, dtype=[('id', 'int16'),('coords', 'float16', 3),('atomicnum', 'int8')])
+            n_coords.fill(np.nan)
+            n_nonh = neighbors#[neighbors['atomicnum']!=1]
+            if len(n_nonh) > 0:
+                n_coords[:len(n_nonh)] = n_nonh['coords']
             a.append(
             (atom.idx,
                       atom.coords,
@@ -88,13 +88,13 @@ class Molecule:
                       n_coords,
                       # residue info
                       residue.idx if residue else 0,
-                      residue.name if residue else 'LIG',
+                      residue.name if residue else '',
                       residue.OBResidue.GetAtomProperty(atom.OBAtom, 2) if residue else False, # is backbone
                       # atom properties
                       atom.OBAtom.IsHbondAcceptor(),
                       atom.OBAtom.IsHbondDonor(),
                       atom.OBAtom.IsMetal(),
-                      atom.atomicnum == 6 and len(neighbors) > 0 and ((neighbors['atomicnum'] != 1).any() or (neighbors['atomicnum'] != 6).any()), #hydrophobe
+                      atom.atomicnum == 6 and len(neighbors) > 0 and not (neighbors['atomicnum'] != 6).any(), #hydrophobe
                       atom.OBAtom.IsAromatic(),
                       atom.type in ['O3-', '02-' 'O-'], # is charged (minus)
                       atom.type in ['N3+', 'N2+', 'Ng+'], # is charged (plus)
@@ -156,9 +156,9 @@ class Molecule:
                 coords = atom_dict[np.in1d(atom_dict['id'], path)]['coords']
                 centroid = coords.mean(axis=0)
                 # get vector perpendicular to ring
-                vector = np.cross(coords - np.vstack((coords[1:],coords[:1])), np.vstack((coords[1:],coords[:1])) - np.vstack((coords[2:],coords[:2])))
+                vector = np.cross(coords - np.vstack((coords[1:],coords[:1])), np.vstack((coords[1:],coords[:1])) - np.vstack((coords[2:],coords[:2]))).mean(axis=0) - centroid
                 r.append((centroid, vector))
-        ring_dict = np.array(r)
+        ring_dict = np.array(r, dtype=[('centroid', 'float16', 3),('vector', 'float16', 3)])
         
         self.atom_dict = atom_dict
         self.ring_dict = ring_dict
@@ -167,100 +167,120 @@ class Molecule:
 
 
 
-def hbond_acceptor_donor(mol1, mol2, cutoff = 3.5, tolerance = 30):
+def hbond_acceptor_donor(mol1, mol2, cutoff = 3.5, base_angle = 120, tolerance = 30):
     all_a = mol1.atom_dict[mol1.atom_dict['isacceptor']]
     all_d = mol2.atom_dict[mol2.atom_dict['isdonor']]
 
-    dist = distance(all_a['coords'], all_d['coords'])
-
-    index_crude = np.argwhere(dist < cutoff)
+    index_crude = np.argwhere(distance(all_a['coords'], all_d['coords']) < cutoff)
 
     a = all_a[index_crude[:,0]]
     d = all_d[index_crude[:,1]]
 
     #skip empty values
-    if len(a) == 0 or len(d) == 0:
-        return [], []
+    if len(a) > 0 and len(d) > 0:
+        angle1 = angle_3p(d['coords'],a['coords'],a['neighbors'][:,:,np.newaxis,:])
+        angle2 = angle_3p(a['coords'],d['coords'],d['neighbors'][:,:,np.newaxis,:])
 
-    angle1 = angle_3p(d['coords'],a['coords'],a['neighbors'][:,:,np.newaxis,:])
-    angle2 = angle_3p(a['coords'],d['coords'],d['neighbors'][:,:,np.newaxis,:])
+        a_neighbors_num = np.sum(~np.isnan(a['neighbors'][:,:,0]))
+        d_neighbors_num = np.sum(~np.isnan(d['neighbors'][:,:,0]))
 
-    a_neighbors_num = np.sum(~np.isnan(a['neighbors'][:,:,0]))
-    d_neighbors_num = np.sum(~np.isnan(d['neighbors'][:,:,0]))
-
-    # check for angles (including tolerance) or skip if NaN
-    var_a = ((angle1>(120/a_neighbors_num-tolerance)) | np.isnan(angle1)).all(axis=1)
-    var_d = ((angle2>(120/d_neighbors_num-tolerance)) | np.isnan(angle2)).all(axis=1)
-
-    index = np.argwhere(var_a & var_d)  
+        index = np.argwhere(((angle1>(base_angle/a_neighbors_num-tolerance)) | np.isnan(angle1)).all(axis=1) & ((angle2>(base_angle/d_neighbors_num-tolerance)) | np.isnan(angle2)).all(axis=1))  
     
-    hbond_dtype = [('a_id', 'int16'),
-                    ('a_resid', 'int16'),
-                    ('a_resname', 'a3'),
-                    ('d_id', 'int16'),
-                    ('d_resid', 'int16'),
-                    ('d_resname', 'a3'),
-                    ('isstrict', 'bool')
-                    ]
+    #hbond = np.array([(a,d,False) for i in index])
+    #return 
     
-    hbond = np.array(np.dstack((a['id'], a['resid'], a['resname'], d['id'], d['resid'], d['resname'])), dtype=hbond_dtype)
-    #hbond = np.dstack((a[['id', 'resid', 'resname']], d['id'], d['resid'], d['resname']))
-    #hbond = np.concatenate((a[['id', 'resid', 'resname']],a[['id', 'resid', 'resname']]))
-    #hbond[:][] = zip(a[index[:,0]],d[index[:,1]])
-    return hbond
-
 def hbond(mol1, mol2, cutoff = 3.5, tolerance = 30):
     h1 = hbond_acceptor_donor(mol1, mol2, cutoff = cutoff, tolerance = tolerance)
     h2 = hbond_acceptor_donor(mol2, mol1, cutoff = cutoff, tolerance = tolerance)
-    return [h1, h2]
+    #return np.concatenate((h1, h2)), np.concatenate((h1_strict, h2_strict))
 
 
 
-def pi_stacking(mol1, mol2):
-    pi_stacking = []
-    if len(mol1.pi) > 0 and len(mol2.pi) > 0:
-        for mol1_atom, mol2_atom in np.argwhere(distance(mol1.pi, mol2.pi) < pi_cutoff):
-                v_mol1 = mol1.pi_vec[mol1_atom] - mol1.pi[mol1_atom]
-                v_centers = mol2.pi[mol2_atom] - mol1.pi[mol1_atom]
-                v_mol2 = mol2.pi_vec[mol2_atom] - mol2.pi[mol2_atom]
-                # check angles for face to face, and edge to face
-                if (angle(v_mol1, v_centers) < pi_tolerance or angle(v_mol1, v_centers) > 180 - pi_tolerance) and (angle(v_mol2, v_mol1) < pi_tolerance or angle(v_mol2, v_mol1) > 180 - pi_tolerance or np.abs(angle(v_mol2, v_mol1) - 90) < pi_tolerance):
-                pi_stacking.append({'atom_id': [mol1.pi_id[mol1_atom],  mol2.pi_id[mol2_atom]], 'res_names': [mol1.pi_res[mol1_atom] if mol1.protein == True else '', mol2.pi_res[mol2_atom] if mol2.protein == True else '']})
-    return pi_stacking
 
-def salt_bridges(mol1, mol2):
-    salt_bridges = []
-    if len(mol1.salt_minus) > 0 and len(mol2.salt_plus) > 0:
-        for mol1_atom, mol2_atom in np.argwhere(distance(mol1.salt_minus, mol2.salt_plus) < salt_bridge_cutoff):
-            salt_bridges.append({'atom_id': [mol1.salt_minus_id[mol1_atom],  mol2.salt_plus_id[mol2_atom]], 'res_names': [mol1.salt_minus_res[mol1_atom] if mol1.protein == True else '', mol2.salt_plus_res[mol2_atom] if mol2.protein == True else '']})
-    if len(mol1.salt_plus) and len(mol2.salt_minus) > 0:
-        for mol1_atom, mol2_atom in np.argwhere(distance(mol1.salt_plus, mol2.salt_minus) < salt_bridge_cutoff):
-            salt_bridges.append({'atom_id': [mol1.salt_plus_id[mol1_atom],  mol2.salt_minus_id[mol2_atom]], 'res_names': [mol1.salt_plus_res[mol1_atom] if mol1.protein == True else '', mol2.salt_minus_res[mol2_atom] if mol2.protein == True else '']})
-    return salt_bridges
+def pi_stacking(mol1, mol2, cutoff = 5, tolerance = 30):
+    all_r1 = mol1.ring_dict
+    all_r2 = mol2.ring_dict
+    
+    if len(all_r1) > 0 and len(all_r2) > 0:
+        index_crude = np.argwhere(distance(all_r1['centroid'], all_r2['centroid']) < cutoff)
+        r1 = all_r1[index_crude[:,0]]
+        r2 = all_r2[index_crude[:,1]]
+        
+        if len(r1) == 0 or len(r2) == 0:
+            angle1 = angle(r1['vector'],r2['vector'])
+            angle2 = angle_3p(r1['vector'] + r1['centroid'],r1['centroid'], r2['centroid'])
+            index = np.argwhere(((angle1 > 180 - tolerance) | (angle1 < tolerance) | (angle2 > 90 - tolerance)) & ((angle2 > 180 - tolerance) | (angle1 < tolerance)))
+    
+    #pistacking
+    
+    return False
 
-def hydrophobic_contacts(mol1, mol2):
-    hydrophobic_contacts = []
-    if len(mol1.hydrophobe) > 0 and len(mol2.hydrophobe) > 0:
-        for mol1_atom, mol2_atom in np.argwhere(distance(mol1.hydrophobe, mol2.hydrophobe) < hydrophobe_cutoff):
-            hydrophobic_contacts.append({'atom_id': [mol1.hydrophobe_id[mol1_atom],  mol2.hydrophobe_id[mol2_atom]], 'res_names': [mol1.hydrophobe_res[mol1_atom] if mol1.protein == True else '', mol2.hydrophobe_res[mol2_atom] if mol2.protein == True else '']})
-    return hydrophobic_contacts
+def salt_bridges(mol1, mol2, cutoff = 4):
+    m1_plus = mol1.atom_dict[mol1.atom_dict['isplus']]
+    m2_minus = mol2.atom_dict[mol2.atom_dict['isminus']]
+
+    index = np.argwhere(distance(m1_plus['coords'], m2_minus['coords']) < cutoff)
+    
+    # other way around
+    m1_minus = mol1.atom_dict[mol1.atom_dict['isminus']]
+    m2_plus = mol2.atom_dict[mol2.atom_dict['isplus']]
+
+    index = np.argwhere(distance(m2_plus['coords'], m1_minus['coords']) < cutoff)
+    
+    #salt_bridges
+    return False
+
+def hydrophobic_contacts(mol1, mol2, cutoff = 4):
+    h1 = mol1.atom_dict[mol1.atom_dict['ishydrophobe']]
+    h2 = mol2.atom_dict[mol2.atom_dict['ishydrophobe']]
+
+    index = np.argwhere(distance(h1['coords'], h2['coords']) < cutoff)
+    
+    #hydrophobic_contacts
+    return False
 
 
-def pi_cation(mol1, mol2):
-    pi_cation = []
-    if len(mol1.salt_plus) > 0 and len(mol2.pi) > 0:
-        for mol1_atom, mol2_atom in np.argwhere(distance(mol1.salt_plus, mol2.pi) < pi_cation_cutoff):
-            v_pi = mol2.pi_vec[mol2_atom] - mol2.pi[mol2_atom]
-            v_cat = mol1.salt_plus[mol1_atom] - mol2.pi[mol2_atom]
-            if angle(v_pi, v_cat) < pi_tolerance or angle(v_pi, v_cat) > 180 - pi_tolerance:
-                pi_cation.append({'atom_id': [mol1.salt_plus_id[mol1_atom],  mol2.pi_id[mol2_atom]], 'res_names': [mol1.salt_plus_res[mol1_atom] if mol1.protein == True else '', mol2.pi_res[mol2_atom] if mol2.protein == True else '']})
-    if len(mol1.pi) > 0 and len(mol2.salt_plus) > 0:
-        for mol1_atom, mol2_atom in np.argwhere(distance(mol1.pi, mol2.salt_plus) < pi_cation_cutoff):
-            v_pi = mol1.pi_vec[mol1_atom] - mol1.pi[mol1_atom]
-            v_cat = mol2.salt_plus[mol2_atom] - mol1.pi[mol1_atom]
-            if angle(v_pi, v_cat) < pi_tolerance or angle(v_pi, v_cat) > 180 - pi_tolerance:    
-                pi_cation.append({'atom_id': [mol1.pi_id[mol1_atom],  mol2.salt_plus_id[mol2_atom]], 'res_names': [mol1.pi_res[mol1_atom] if mol1.protein == True else '', mol2.salt_plus_res[mol2_atom] if mol2.protein == True else '']})
-    return pi_cation
+def pi_cation(mol1, mol2, cutoff = 5, tolerance = 30):
+    all_r1 = mol1.ring_dict
+    all_plus2 = mol2.atom_dict[mol2.atom_dict['isplus']]
+    
+    if len(all_r1) and len(all_plus2):
+        index_crude = np.argwhere(distance(all_r1['centroid'], all_plus2['coords']) < cutoff)
+        
+        r1 = all_r1[index_crude[:,0]]
+        plus2 = all_plus2[index_crude[:,1]]
+        
+        if len(r1) > 0 and len(plus2) > 0:
+            angle1 = angle(r1['vector'], plus2['coords'] - r1['centroid'])
+            index = np.argwhere((angle1 > 180 - tolerance) | (angle1 < tolerance))
+    
+    # other way around
+    all_plus1 = mol1.atom_dict[mol1.atom_dict['isplus']]
+    all_r2 = mol2.ring_dict
+    
+    if len(all_r1) and len(all_plus2):
+        index_crude = np.argwhere(distance(all_r2['centroid'], all_plus1['coords']) < cutoff)
+        
+        plus1 = all_plus1[index_crude[:,1]]
+        r2 = all_r2[index_crude[:,0]]
+        
+        if len(r2) > 0 and len(plus1) > 0:
+            angle1 = angle(r1['vector'], plus2['coords'] - r1['centroid'])
+            index = np.argwhere((angle1 > 180 - tolerance) | (angle1 < tolerance))
+    
+    #pication
+    
+    return False
+
+
+
+
+
+
+
+
+#######################################################################333
+
 
 
 def metal_acceptor(mol1, mol2):
@@ -332,14 +352,18 @@ def halogenbond(mol1, mol2):
     return h1 + h2, h1_crude + h2_crude
 
 
+def angle_3p(p1,p2,p3):
+    """ Return an angle from 3 points in cartesian space (point #2 is centroid) """
+    v1 = p1-p2
+    v2 = p3-p2
+    return angle(v1,v2)
+
 def angle(v1, v2):
     """ Return an angle between two vectors in degrees """
-    v1 = np.array(v1)
-    v2 = np.array(v2)
     dot = (v1*v2).sum(axis=-1) # better than np.dot(v1, v2), multiple vectors can be applied
     norm = np.linalg.norm(v1, axis=-1)* np.linalg.norm(v2, axis=-1)
-    return np.nan_to_num(np.degrees(np.arccos(dot/norm)))
-    
+    return np.degrees(np.arccos(dot/norm))
+
 def dihedral(p1,p2,p3,p4):
     """ Calculate dihedral from 4 points """
     v12 = (p1-p2)/np.linalg.norm(p1-p2)
@@ -357,5 +381,8 @@ def dihedral(p1,p2,p3,p4):
     else:
         out[mask] = -out[mask]
     return out
+
+
+
 
 
