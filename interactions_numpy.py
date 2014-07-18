@@ -33,7 +33,7 @@ class Molecule:
                  ('charge', 'float16'),
                  ('atomicnum', 'int8'),
                  ('atomtype','a3'),
-                 ('neighbors', 'float16', (6,3)), # non-H neighbors coordinates for angles (max of 6 neighbors should be enough)
+                 ('neighbors', 'float16', (4,3)), # non-H neighbors coordinates for angles (max of 6 neighbors should be enough)
                  # residue info
                  ('resid', 'int16'),
                  ('resname', 'a3'),
@@ -53,7 +53,7 @@ class Molecule:
                  ]
 
         a = []
-        #atom_dict = np.empty(molecule.OBMol.NumAtoms(), dtype=atom_dtype)
+        atom_dict = np.empty(molecule.OBMol.NumHvyAtoms(), dtype=atom_dtype)
         i = 0
         for atom in molecule:
             # skip hydrogens for performance
@@ -65,27 +65,22 @@ class Molecule:
                 residue = False
             
             # get neighbors, but only for those atoms which realy need them
-            neighbors = []
-            n_coords = np.empty((6,3), dtype='float16')
+            #neighbors = []
+            #n_coords = np.empty((6,3), dtype='float16')
+            neighbors = np.empty(4, dtype=[('coords', 'float16', 3),('atomicnum', 'int8')])
+            neighbors.fill(np.nan)
+            n = 0
             for nbr_atom in [pybel.Atom(x) for x in OBAtomAtomIter(atom.OBAtom)]:
                 if nbr_atom.atomicnum == 1:
                     continue
-                neighbors.append((nbr_atom.idx,
-                                  nbr_atom.coords,
-                                  nbr_atom.atomicnum
-                                  ))
-            neighbors = np.array(neighbors, dtype=[('id', 'int16'),('coords', 'float16', 3),('atomicnum', 'int8')])
-            n_coords.fill(np.nan)
-            n_nonh = neighbors#[neighbors['atomicnum']!=1]
-            if len(n_nonh) > 0:
-                n_coords[:len(n_nonh)] = n_nonh['coords']
-            a.append(
-            (atom.idx,
+                neighbors[n] = (nbr_atom.coords, nbr_atom.atomicnum)
+                n += 1
+            atom_dict[i] = (atom.idx,
                       atom.coords,
                       atom.partialcharge,
                       atom.atomicnum,
                       atom.type,
-                      n_coords,
+                      neighbors['coords'], #n_coords,
                       # residue info
                       residue.idx if residue else 0,
                       residue.name if residue else '',
@@ -102,9 +97,7 @@ class Molecule:
                       False, # alpha
                       False # beta
                       )
-            )
             i +=1
-        atom_dict = np.array(a, dtype=atom_dtype)
         
         if protein:
             # Protein Residues (alpha helix and beta sheet)
@@ -152,7 +145,7 @@ class Molecule:
         r = []
         for ring in molecule.sssr:
             if ring.IsAromatic():
-                path = np.array(ring._path) # path of atom ID's (1-n)
+                path = ring._path
                 coords = atom_dict[np.in1d(atom_dict['id'], path)]['coords']
                 centroid = coords.mean(axis=0)
                 # get vector perpendicular to ring
@@ -218,14 +211,16 @@ def pi_stacking(mol1, mol2, cutoff = 5, tolerance = 30):
 def salt_bridges(mol1, mol2, cutoff = 4):
     m1_plus = mol1.atom_dict[mol1.atom_dict['isplus']]
     m2_minus = mol2.atom_dict[mol2.atom_dict['isminus']]
-
-    index = np.argwhere(distance(m1_plus['coords'], m2_minus['coords']) < cutoff)
+    
+    if len(m1_plus) > 0 and len(m2_minus) > 0:
+        index = np.argwhere(distance(m1_plus['coords'], m2_minus['coords']) < cutoff)
     
     # other way around
     m1_minus = mol1.atom_dict[mol1.atom_dict['isminus']]
     m2_plus = mol2.atom_dict[mol2.atom_dict['isplus']]
 
-    index = np.argwhere(distance(m2_plus['coords'], m1_minus['coords']) < cutoff)
+    if len(m2_plus) > 0 and len(m1_minus) > 0:
+        index = np.argwhere(distance(m2_plus['coords'], m1_minus['coords']) < cutoff)
     
     #salt_bridges
     return False
@@ -233,8 +228,9 @@ def salt_bridges(mol1, mol2, cutoff = 4):
 def hydrophobic_contacts(mol1, mol2, cutoff = 4):
     h1 = mol1.atom_dict[mol1.atom_dict['ishydrophobe']]
     h2 = mol2.atom_dict[mol2.atom_dict['ishydrophobe']]
-
-    index = np.argwhere(distance(h1['coords'], h2['coords']) < cutoff)
+    
+    if len(h1) > 0 and len(h2) > 0:
+        index = np.argwhere(distance(h1['coords'], h2['coords']) < cutoff)
     
     #hydrophobic_contacts
     return False
