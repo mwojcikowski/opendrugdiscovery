@@ -56,9 +56,15 @@ class Molecule:
         atom_dict = np.empty(molecule.OBMol.NumHvyAtoms(), dtype=atom_dtype)
         i = 0
         for atom in molecule:
+            
+            atomicnum = atom.atomicnum
             # skip hydrogens for performance
-            if atom.atomicnum == 1:
+            if atomicnum == 1:
                 continue
+            atomtype = atom.type
+            partialcharge = atom.partialcharge
+            coords = atom.coords
+            
             if protein:
                 residue = pybel.Residue(atom.OBAtom.GetResidue())
             else:
@@ -76,10 +82,10 @@ class Molecule:
                 neighbors[n] = (nbr_atom.coords, nbr_atom.atomicnum)
                 n += 1
             atom_dict[i] = (atom.idx,
-                      atom.coords,
-                      atom.partialcharge,
-                      atom.atomicnum,
-                      atom.type,
+                      coords,
+                      partialcharge,
+                      atomicnum,
+                      atomtype,
                       neighbors['coords'], #n_coords,
                       # residue info
                       residue.idx if residue else 0,
@@ -89,11 +95,11 @@ class Molecule:
                       atom.OBAtom.IsHbondAcceptor(),
                       atom.OBAtom.IsHbondDonor(),
                       atom.OBAtom.IsMetal(),
-                      atom.atomicnum == 6 and len(neighbors) > 0 and not (neighbors['atomicnum'] != 6).any(), #hydrophobe
+                      atomicnum == 6 and len(neighbors) > 0 and not (neighbors['atomicnum'] != 6).any(), #hydrophobe
                       atom.OBAtom.IsAromatic(),
-                      atom.type in ['O3-', '02-' 'O-'], # is charged (minus)
-                      atom.type in ['N3+', 'N2+', 'Ng+'], # is charged (plus)
-                      atom.atomicnum in [9,17,35,53], # is halogen?
+                      atomtype in ['O3-', '02-' 'O-'], # is charged (minus)
+                      atomtype in ['N3+', 'N2+', 'Ng+'], # is charged (plus)
+                      atomicnum in [9,17,35,53], # is halogen?
                       False, # alpha
                       False # beta
                       )
@@ -188,6 +194,31 @@ def hbond(mol1, mol2, cutoff = 3.5, tolerance = 30):
     #return np.concatenate((h1, h2)), np.concatenate((h1_strict, h2_strict))
 
 
+def halogenbond_acceptor_halogen(mol1, mol2, base_angle_acceptor = 120, base_angle_halogen = 180, tolerance = 30, cutoff = 4):
+    all_a = mol1.atom_dict[mol1.atom_dict['isacceptor']]
+    all_h = mol2.atom_dict[mol2.atom_dict['ishalogen']]
+
+    index_crude = np.argwhere(distance(all_a['coords'], all_h['coords']) < cutoff)
+
+    a = all_a[index_crude[:,0]]
+    h = all_h[index_crude[:,1]]
+
+    #skip empty values
+    if len(a) > 0 and len(h) > 0:
+        angle1 = angle_3p(h['coords'],a['coords'],a['neighbors'][:,:,np.newaxis,:])
+        angle2 = angle_3p(a['coords'],h['coords'],h['neighbors'][:,:,np.newaxis,:])
+
+        a_neighbors_num = np.sum(~np.isnan(a['neighbors'][:,:,0]))
+
+        index = np.argwhere(((angle1>(base_angle_acceptor/a_neighbors_num-tolerance)) | np.isnan(angle1)).all(axis=1) & ((angle2>(base_angle_halogen-tolerance)) | np.isnan(angle2)).all(axis=1))  
+    
+    #halogenbond = np.array([(a,h,False) for i in index])
+    return False
+
+def halogenbond(mol1, mol2, base_angle_acceptor = 120, base_angle_halogen = 180, tolerance = 30, cutoff = 4):
+    h1 = halogenbond_acceptor_halogen(mol1, mol2, base_angle_acceptor = base_angle_acceptor, base_angle_halogen = base_angle_halogen, tolerance = tolerance, cutoff = cutoff)
+    h2 = halogenbond_acceptor_halogen(mol2, mol1, base_angle_acceptor = base_angle_acceptor, base_angle_halogen = base_angle_halogen, tolerance = tolerance, cutoff = cutoff)
+    return False
 
 
 def pi_stacking(mol1, mol2, cutoff = 5, tolerance = 30):
@@ -268,85 +299,49 @@ def pi_cation(mol1, mol2, cutoff = 5, tolerance = 30):
     
     return False
 
+def metal_acceptor(mol1, mol2, base_angle = 120, tolerance = 30, cutoff = 4):
+    all_a = mol1.atom_dict[mol1.atom_dict['isacceptor']]
+    all_m = mol2.atom_dict[mol2.atom_dict['ismetal']]
 
+    index_crude = np.argwhere(distance(all_a['coords'], all_m['coords']) < cutoff)
 
+    a = all_a[index_crude[:,0]]
+    m = all_m[index_crude[:,1]]
 
+    #skip empty values
+    if len(a) > 0 and len(m) > 0:
+        angle1 = angle_3p(m['coords'],a['coords'],a['neighbors'][:,:,np.newaxis,:])
 
+        a_neighbors_num = np.sum(~np.isnan(a['neighbors'][:,:,0]))
 
-
-
-#######################################################################333
-
-
-
-def metal_acceptor(mol1, mol2):
-    metal_coordination = []
-    metal_coordination_crude = []
-    if len(mol1.metal) > 0 and len(mol2.acceptors) > 0:
-        for mol1_atom, mol2_atom in np.argwhere(distance(mol1.metal, mol2.acceptors) < hbond_cutoff):
-            coord = True # assume that ther is hbond, than check angles
-            for v_an in mol2.acceptors_vec[mol2_atom]:
-                v_am = mol2.acceptors[mol2_atom] - mol1.metal[mol1_atom]
-                # check if hbond should be discarded
-                if angle(v_am, v_an) < 120/len(mol2.acceptors_vec[mol2_atom]) - hbond_tolerance:
-                    coord = False
-                    break    
-            if coord:
-                metal_coordination.append({'atom_id': [mol1.metal_id[mol1_atom],  mol2.acceptors_id[mol2_atom]], 'res_names': [mol1.metal_res[mol1_atom] if mol1.protein == True else '', mol2.acceptors_res[mol2_atom] if mol2.protein == True else '']})
-            else:
-                metal_coordination_crude.append({'atom_id': [mol1.metal_id[mol1_atom],  mol2.acceptors_id[mol2_atom]], 'res_names': [mol1.metal_res[mol1_atom] if mol1.protein == True else '', mol2.acceptors_res[mol2_atom] if mol2.protein == True else '']})
-    return metal_coordination, metal_coordination_crude
+        index = np.argwhere(((angle1>(base_angle/a_neighbors_num-tolerance)) | np.isnan(angle1)).all(axis=1))
+    
+    #metalacceptor = np.array([(a,d,False) for i in index])
+    #return 
     
         
-def metal_pi(mol1, mol2):
-    metal_coordination = []
-    metal_coordination_crude = []
-    if len(mol1.metal) > 0 and len(mol2.pi) > 0:
-        for mol1_atom, mol2_atom in np.argwhere(distance(mol1.metal, mol2.pi) < pi_cation_cutoff):
-            v_pi = mol2.pi_vec[mol2_atom] - mol2.pi[mol2_atom]
-            v_cat = mol1.metal[mol1_atom] - mol2.pi[mol2_atom]
-            if angle(v_pi, v_cat) < pi_tolerance or angle(v_pi, v_cat) > 180 - pi_tolerance:
-                metal_coordination.append({'atom_id': [mol1.metal_id[mol1_atom],  mol2.pi_id[mol2_atom]], 'res_names': [mol1.metal_res[mol1_atom] if mol1.protein == True else '', mol2.pi_res[mol2_atom] if mol2.protein == True else '']})
-            else:
-                metal_coordination_crude.append({'atom_id': [mol1.metal_id[mol1_atom],  mol2.pi_id[mol2_atom]], 'res_names': [mol1.metal_res[mol1_atom] if mol1.protein == True else '', mol2.pi_res[mol2_atom] if mol2.protein == True else '']})
-    return metal_coordination, metal_coordination_crude
+def metal_pi(mol1, mol2, cutoff = 5, tolerance = 30):
+    all_r1 = mol1.ring_dict
+    all_m = mol2.atom_dict[mol2.atom_dict['ismetal']]
+    
+    if len(all_r1) and len(all_m):
+        index_crude = np.argwhere(distance(all_r1['centroid'], all_m['coords']) < cutoff)
+        
+        r1 = all_r1[index_crude[:,0]]
+        m = all_m[index_crude[:,1]]
+        
+        if len(r1) > 0 and len(m) > 0:
+            angle1 = angle(r1['vector'], m['coords'] - r1['centroid'])
+            index = np.argwhere((angle1 > 180 - tolerance) | (angle1 < tolerance))
+    #metalpi
+    return False
 
 def metal_coordination(mol1, mol2):
-    (m1, m1_crude) = metal_acceptor(mol1, mol2)
-    (m2, m2_crude) = metal_acceptor(mol2, mol1)
-    (m3, m3_crude) = metal_pi(mol1, mol2)
-    (m4, m4_crude) = metal_pi(mol2, mol1)
-    return m1+m2+m3+m4, m1_crude+m2_crude+m3_crude+m4_crude
-
-def halogenbond_acceptor_halogen(mol1, mol2):
-    halogenbonds = []
-    halogenbonds_crude = []
-    
-    if len(mol1.acceptors) > 0 and len(mol2.halogen) > 0:
-        for mol1_atom, mol2_atom in np.argwhere(distance(mol1.acceptors, mol2.halogen) < halogenbond_cutoff):
-            hbond = True # assume that ther is hydrogenbond, than check angles
-            for v_an in mol1.acceptors_vec[mol1_atom]:
-                for v_hn in mol2.halogen_vec[mol2_atom]:
-                    v_ha = mol2.halogen[mol2_atom] - mol1.acceptors[mol1_atom]
-                    v_ah = mol1.acceptors[mol1_atom] - mol2.halogen[mol2_atom]
-                    # check if hbond should be discarded
-                    if angle(v_an, v_ah) < 120/len(mol1.acceptors_vec[mol1_atom]) - halogenbond_tolerance or angle(v_ha, v_hn) < 150/len(mol2.halogen_vec[mol2_atom]) - halogenbond_tolerance:
-                        hbond = False
-                        break
-                if not hbond:
-                    break
-            if hbond:
-                halogenbonds.append({'atom_id': [mol1.acceptors_id[mol1_atom],  mol2.halogen_id[mol2_atom]], 'res_names': [mol1.acceptors_res[mol1_atom] if mol1.protein == True else '', mol2.halogen_res[mol2_atom] if mol2.protein == True else '']})
-            else:
-                halogenbonds_crude.append({'atom_id': [mol1.acceptors_id[mol1_atom],  mol2.halogen_id[mol2_atom]], 'res_names': [mol1.acceptors_res[mol1_atom] if mol1.protein == True else '', mol2.halogen_res[mol2_atom] if mol2.protein == True else '']})
-
-    return halogenbonds, halogenbonds_crude
-
-def halogenbond(mol1, mol2):
-    (h1, h1_crude) = halogenbond_acceptor_halogen(mol1, mol2)
-    (h2, h2_crude) = halogenbond_acceptor_halogen(mol2, mol1)
-    return h1 + h2, h1_crude + h2_crude
-
+    m1 = metal_acceptor(mol1, mol2)
+    m2 = metal_acceptor(mol2, mol1)
+    m3 = metal_pi(mol1, mol2)
+    m4 = metal_pi(mol2, mol1)
+    return False
 
 def angle_3p(p1,p2,p3):
     """ Return an angle from 3 points in cartesian space (point #2 is centroid) """
