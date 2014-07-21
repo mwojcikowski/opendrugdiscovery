@@ -17,7 +17,7 @@ halogenbond_tolerance = 30
 pybel.ob.obErrorLog.StopLogging()
 
 class Molecule:
-    def __init__(self, molecule, protein=False):
+    def __init__(self, molecule, protein = False, charge = True):
         self.protein = protein
         #ob.DeterminePeptideBackbone(molecule.OBMol)
 
@@ -62,7 +62,7 @@ class Molecule:
             if atomicnum == 1:
                 continue
             atomtype = atom.type
-            partialcharge = atom.partialcharge
+            partialcharge = atom.partialcharge if charge else 0
             coords = atom.coords
             
             if protein:
@@ -76,10 +76,11 @@ class Molecule:
             neighbors = np.empty(4, dtype=[('coords', 'float16', 3),('atomicnum', 'int8')])
             neighbors.fill(np.nan)
             n = 0
-            for nbr_atom in [pybel.Atom(x) for x in OBAtomAtomIter(atom.OBAtom)]:
-                if nbr_atom.atomicnum == 1:
+            for nbr_atom in [x for x in OBAtomAtomIter(atom.OBAtom)]:
+                nbr_atomicnum = nbr_atom.GetAtomicNum()
+                if nbr_atomicnum == 1:
                     continue
-                neighbors[n] = (nbr_atom.coords, nbr_atom.atomicnum)
+                neighbors[n] = ((nbr_atom.GetX(), nbr_atom.GetY(), nbr_atom.GetZ()), nbr_atomicnum)
                 n += 1
             atom_dict[i] = (atom.idx,
                       coords,
@@ -372,8 +373,4 @@ def dihedral(p1,p2,p3,p4):
     else:
         out[mask] = -out[mask]
     return out
-
-
-
-
 
