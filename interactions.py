@@ -307,7 +307,7 @@ def pi_stacking(mol1, mol2):
                 v_mol2 = mol2.pi_vec[mol2_atom] - mol2.pi[mol2_atom]
                 # check angles for face to face, and edge to face
                 if (angle(v_mol1, v_centers) < pi_tolerance or angle(v_mol1, v_centers) > 180 - pi_tolerance) and (angle(v_mol2, v_mol1) < pi_tolerance or angle(v_mol2, v_mol1) > 180 - pi_tolerance or np.abs(angle(v_mol2, v_mol1) - 90) < pi_tolerance):
-                pi_stacking.append({'atom_id': [mol1.pi_id[mol1_atom],  mol2.pi_id[mol2_atom]], 'res_names': [mol1.pi_res[mol1_atom] if mol1.protein == True else '', mol2.pi_res[mol2_atom] if mol2.protein == True else '']})
+                    pi_stacking.append({'atom_id': [mol1.pi_id[mol1_atom],  mol2.pi_id[mol2_atom]], 'res_names': [mol1.pi_res[mol1_atom] if mol1.protein == True else '', mol2.pi_res[mol2_atom] if mol2.protein == True else '']})
     return pi_stacking
 
 def salt_bridges(mol1, mol2):
