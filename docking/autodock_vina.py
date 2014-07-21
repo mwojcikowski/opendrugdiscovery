@@ -8,7 +8,7 @@ import pybel
 
 class autodock_vina:
     def __init__(self, protein, size=(10,10,10), center=(0,0,0), auto_ligand=None, exhaustivness=8, num_modes=9, energy_range=3, seed=None, prefix_dir='/tmp', ncpu=1, executable=None, autocleanup=True):
-        self.dir = prefix_dir,
+        self.dir = prefix_dir
         # define binding site
         self.size = size
         self.center = center
