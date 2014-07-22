@@ -16,16 +16,46 @@ halogenbond_tolerance = 30
 
 pybel.ob.obErrorLog.StopLogging()
 
-class Molecule:
-    def __init__(self, molecule, protein = False, charge = True):
+class Molecule(pybel.Molecule):
+    def __init__(self, molecule, protein = False):
+        # call parent constructor
+        super(Molecule,self).__init__(molecule.OBMol)
+        
         self.protein = protein
+        
         #ob.DeterminePeptideBackbone(molecule.OBMol)
-
         # percieve chains in residues
         #if len(res_dict) > 1 and not molecule.OBMol.HasChainsPerceived():
         #    print "Dirty HACK"
         #    molecule = pybel.readstring('pdb', molecule.write('pdb'))
-
+        
+        self._atom_dict = None
+        self._res_dict = None
+        self._ring_dict = None
+        
+        
+    @property
+    def atom_dict(self):
+        # check cache and generate dicts
+        if self._atom_dict is None:
+            self._dicts()
+        return self._atom_dict
+        
+    @property
+    def res_dict(self):
+        # check cache and generate dicts
+        if self._res_dict is None:
+            self._dicts()
+        return self._res_dict
+        
+    @property
+    def ring_dict(self):
+        # check cache and generate dicts
+        if self._ring_dict is None:
+            self._dicts()
+        return self._ring_dict
+    
+    def _dicts(self):
         # Atoms
         atom_dtype = [('id', 'int16'),
                  # atom info
@@ -53,19 +83,19 @@ class Molecule:
                  ]
 
         a = []
-        atom_dict = np.empty(molecule.OBMol.NumHvyAtoms(), dtype=atom_dtype)
+        atom_dict = np.empty(self.OBMol.NumHvyAtoms(), dtype=atom_dtype)
         i = 0
-        for atom in molecule:
+        for atom in self:
             
             atomicnum = atom.atomicnum
             # skip hydrogens for performance
             if atomicnum == 1:
                 continue
             atomtype = atom.type
-            partialcharge = atom.partialcharge if charge else 0
+            partialcharge = atom.partialcharge
             coords = atom.coords
             
-            if protein:
+            if self.protein:
                 residue = pybel.Residue(atom.OBAtom.GetResidue())
             else:
                 residue = False
@@ -106,7 +136,7 @@ class Molecule:
                       )
             i +=1
         
-        if protein:
+        if self.protein:
             # Protein Residues (alpha helix and beta sheet)
             res_dtype = [('id', 'int16'),
                          ('resname', 'a3'),
@@ -118,7 +148,7 @@ class Molecule:
                          ] # N, CA, C
 
             b = []
-            for residue in molecule.residues:
+            for residue in self.residues:
                 backbone = {}
                 for atom in residue:
                     if residue.OBResidue.GetAtomProperty(atom.OBAtom,1):
@@ -150,7 +180,7 @@ class Molecule:
 
         # Aromatic Rings
         r = []
-        for ring in molecule.sssr:
+        for ring in self.sssr:
             if ring.IsAromatic():
                 path = ring._path
                 coords = atom_dict[np.in1d(atom_dict['id'], path)]['coords']
@@ -160,10 +190,10 @@ class Molecule:
                 r.append((centroid, vector))
         ring_dict = np.array(r, dtype=[('centroid', 'float16', 3),('vector', 'float16', 3)])
         
-        self.atom_dict = atom_dict
-        self.ring_dict = ring_dict
-        if protein:
-            self.res_dict = res_dict
+        self._atom_dict = atom_dict
+        self._ring_dict = ring_dict
+        if self.protein:
+            self._res_dict = res_dict
 
 
 
