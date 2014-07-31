@@ -46,9 +46,8 @@ class autodock_vina:
         self.protein.write('pdbqt', protein_file, opt={'r':None,})
         
         output_array = []
-        n = 1
         ligand_dir = mkdtemp(dir = tmp_dir, prefix='ligands_')
-        for ligand in ligands:
+        for n, ligand in enumerate(ligands):
             # write ligand to file
             ligand_file = ligand_dir + '/' + str(n) + '.pdbqt'
             ligand.write('pdbqt', ligand_file, overwrite=True)
@@ -64,16 +63,14 @@ class autodock_vina:
         self.protein.write('pdbqt', protein_file, opt={'r':None,})
         
         output_array = []
-        n = 1
         ligand_dir = mkdtemp(dir = tmp_dir, prefix='ligands_')
-        for ligand in ligands:
+        for n, ligand in enumerate(ligands):
             # write ligand to file
             ligand_file = ligand_dir + '/' + str(n) + '.pdbqt'
             ligand_outfile = ligand_dir + '/' + str(n) + '_out.pdbqt'
             ligand.write('pdbqt', ligand_file, overwrite=True)
             vina = parse_vina_docking_output(subprocess.check_output([self.executable, '--receptor', protein_file, '--ligand', ligand_file, '--out', ligand_outfile] + self.params))
             output_array.append(zip([lig for lig in pybel.readfile('pdbqt', ligand_outfile)], vina))
-            n +=1
         rmtree(tmp_dir)
         return output_array
     
