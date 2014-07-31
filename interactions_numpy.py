@@ -3,17 +3,6 @@ from openbabel import OBAtomAtomIter
 from scipy.spatial.distance import cdist as distance
 import pybel
 
-# define cutoffs
-hbond_cutoff = 3.5
-hbond_tolerance = 30
-salt_bridge_cutoff = 4
-hydrophobe_cutoff = 4
-pi_cutoff = 5
-pi_cation_cutoff = 4
-pi_tolerance = 30
-halogenbond_cutoff = 4
-halogenbond_tolerance = 30
-
 pybel.ob.obErrorLog.StopLogging()
 
 class Molecule(pybel.Molecule):
@@ -195,56 +184,44 @@ class Molecule(pybel.Molecule):
         if self.protein:
             self._res_dict = res_dict
 
-
+def close_contacts(x, y, cutoff):
+    """ Returns pairs of close contacts atoms within cutoff. """
+    index = np.argwhere(distance(x['coords'], y['coords']) < cutoff)
+    return x[index[:,0]], y[index[:,1]]
 
 def hbond_acceptor_donor(mol1, mol2, cutoff = 3.5, base_angle = 120, tolerance = 30):
-    all_a = mol1.atom_dict[mol1.atom_dict['isacceptor']]
-    all_d = mol2.atom_dict[mol2.atom_dict['isdonor']]
-
-    index_crude = np.argwhere(distance(all_a['coords'], all_d['coords']) < cutoff)
-
-    a = all_a[index_crude[:,0]]
-    d = all_d[index_crude[:,1]]
-
+    a, d = close_contacts(mol1.atom_dict[mol1.atom_dict['isacceptor']], mol2.atom_dict[mol2.atom_dict['isdonor']], cutoff)
     #skip empty values
     if len(a) > 0 and len(d) > 0:
-        angle1 = angle_3p(d['coords'],a['coords'],a['neighbors'][:,:,np.newaxis,:])
-        angle2 = angle_3p(a['coords'],d['coords'],d['neighbors'][:,:,np.newaxis,:])
-
-        a_neighbors_num = np.sum(~np.isnan(a['neighbors'][:,:,0]))
-        d_neighbors_num = np.sum(~np.isnan(d['neighbors'][:,:,0]))
-
-        index = np.argwhere(((angle1>(base_angle/a_neighbors_num-tolerance)) | np.isnan(angle1)).all(axis=1) & ((angle2>(base_angle/d_neighbors_num-tolerance)) | np.isnan(angle2)).all(axis=1))  
-    
-    #hbond = np.array([(a,d,False) for i in index])
-    #return 
+        angle1 = angle_3p(d['coords'][:,np.newaxis,:],a['coords'][:,np.newaxis,:],a['neighbors'])
+        angle2 = angle_3p(a['coords'][:,np.newaxis,:],d['coords'][:,np.newaxis,:],d['neighbors'])
+        a_neighbors_num = np.sum(~np.isnan(a['neighbors'][:,:,0]), axis=-1)[:,np.newaxis]
+        d_neighbors_num = np.sum(~np.isnan(d['neighbors'][:,:,0]), axis=-1)[:,np.newaxis]
+        strict = (((angle1>(base_angle/a_neighbors_num-tolerance)) | np.isnan(angle1)) & ((angle2>(base_angle/d_neighbors_num-tolerance)) | np.isnan(angle2))).all(axis=-1)
+        return a, d, strict
+    else:
+        return a, d, np.array([], dtype=bool) 
     
 def hbond(mol1, mol2, cutoff = 3.5, tolerance = 30):
-    h1 = hbond_acceptor_donor(mol1, mol2, cutoff = cutoff, tolerance = tolerance)
-    h2 = hbond_acceptor_donor(mol2, mol1, cutoff = cutoff, tolerance = tolerance)
-    #return np.concatenate((h1, h2)), np.concatenate((h1_strict, h2_strict))
-
+    a1, d1, s1 = hbond_acceptor_donor(mol1, mol2, cutoff = cutoff, tolerance = tolerance)
+    a2, d2, s2 = hbond_acceptor_donor(mol2, mol1, cutoff = cutoff, tolerance = tolerance)
+    return np.concatenate((a1, a2)), \
+            np.concatenate((d1, d2)), \
+            np.concatenate((s1, s2))
+    #return a1, d1, s1
 
 def halogenbond_acceptor_halogen(mol1, mol2, base_angle_acceptor = 120, base_angle_halogen = 180, tolerance = 30, cutoff = 4):
-    all_a = mol1.atom_dict[mol1.atom_dict['isacceptor']]
-    all_h = mol2.atom_dict[mol2.atom_dict['ishalogen']]
-
-    index_crude = np.argwhere(distance(all_a['coords'], all_h['coords']) < cutoff)
-
-    a = all_a[index_crude[:,0]]
-    h = all_h[index_crude[:,1]]
-
+    a, h = close_contacts(mol1.atom_dict[mol1.atom_dict['isacceptor']], mol2.atom_dict[mol2.atom_dict['ishalogen']], cutoff)
     #skip empty values
     if len(a) > 0 and len(h) > 0:
         angle1 = angle_3p(h['coords'],a['coords'],a['neighbors'][:,:,np.newaxis,:])
         angle2 = angle_3p(a['coords'],h['coords'],h['neighbors'][:,:,np.newaxis,:])
-
         a_neighbors_num = np.sum(~np.isnan(a['neighbors'][:,:,0]))
-
-        index = np.argwhere(((angle1>(base_angle_acceptor/a_neighbors_num-tolerance)) | np.isnan(angle1)).all(axis=1) & ((angle2>(base_angle_halogen-tolerance)) | np.isnan(angle2)).all(axis=1))  
+        strict = ((angle1>(base_angle_acceptor/a_neighbors_num-tolerance)) | np.isnan(angle1)).all(axis=1) & ((angle2>(base_angle_halogen-tolerance)) | np.isnan(angle2)).all(axis=1)
+        return a, h, strict
+    else:
+        return False
     
-    #halogenbond = np.array([(a,h,False) for i in index])
-    return False
 
 def halogenbond(mol1, mol2, base_angle_acceptor = 120, base_angle_halogen = 180, tolerance = 30, cutoff = 4):
     h1 = halogenbond_acceptor_halogen(mol1, mol2, base_angle_acceptor = base_angle_acceptor, base_angle_halogen = base_angle_halogen, tolerance = tolerance, cutoff = cutoff)
