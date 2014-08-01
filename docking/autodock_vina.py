@@ -52,7 +52,6 @@ class autodock_vina:
             ligand_file = ligand_dir + '/' + str(n) + '.pdbqt'
             ligand.write('pdbqt', ligand_file, overwrite=True)
             output_array.append(parse_vina_scoring_output(subprocess.check_output([self.executable, '--score_only', '--receptor', protein_file, '--ligand', ligand_file] + self.params)))
-            n +=1
         rmtree(tmp_dir)
         return output_array
             
