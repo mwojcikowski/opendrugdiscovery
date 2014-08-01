@@ -1,447 +1,108 @@
-#/usr/bin/python
 import numpy as np
-from openbabel import OBAtomAtomIter
 from scipy.spatial.distance import cdist as distance
-#from sklearn.metrics.pairwise import euclidean_distances as distance
-import pybel
 
-# define cutoffs
-hbond_cutoff = 3.5
-hbond_tolerance = 30
-salt_bridge_cutoff = 4
-hydrophobe_cutoff = 4
-pi_cutoff = 5
-pi_cation_cutoff = 4
-pi_tolerance = 30
-halogenbond_cutoff = 4
-halogenbond_tolerance = 30
+from . import dihedral,angle,angle_2v
 
-pybel.ob.obErrorLog.StopLogging()
-
-class mol:
-    def __init__(self, mol, protein = False):
-        self.mol = mol
-        self.protein = protein
-        self.dict()
-
-        
-    def dict(self):
-        """ Generate dictionaries of atoms for molecule """
-
-        mol_acceptors = []
-        mol_acceptors_id = []
-        mol_acceptors_res = []
-        mol_acceptors_vec = []
-
-        mol_donors = []
-        mol_donors_id = []
-        mol_donors_res = []
-        mol_donors_vec = []
-
-        mol_salt_plus = []
-        mol_salt_plus_id = []
-        mol_salt_plus_res = []
-
-        mol_salt_minus = []
-        mol_salt_minus_id = []
-        mol_salt_minus_res = []
-
-        mol_hydrophobe = []
-        mol_hydrophobe_id = []
-        mol_hydrophobe_res = []
-        
-        mol_metal = []
-        mol_metal_id = []
-        mol_metal_res = []
-        
-        mol_halogen = []
-        mol_halogen_id = []
-        mol_halogen_res = []
-        mol_halogen_vec = []    
-        
-        mol_pi = []
-        mol_pi_id = []
-        mol_pi_vec = []
-        mol_pi_res = []
-        
-        atoms = []
-        if self.protein:
-            for residue in self.mol.residues:
-                for atom in residue:
-                    atoms.append((atom, residue))
-        else:
-            for atom in self.mol:
-                atoms.append((atom, None))
-        
-        if self.protein:
-            for atom, residue in atoms:
-#            for residue in self.mol.residues:
-#                for atom in residue:
-                # protein hydrophobe
-                if residue.OBResidue.GetAminoAcidProperty(8) and atom.atomicnum == 6:
-                    mol_hydrophobe.append(atom.coords)
-                    mol_hydrophobe_id.append(atom.idx)
-                    if self.protein:
-                        mol_hydrophobe_res.append(residue.name[:3]+str(residue.OBResidue.GetNum()))
-            
-                # protein hbond
-                if atom.OBAtom.IsHbondDonor():
-                    mol_donors.append(atom.coords)
-                    mol_donors_id.append(atom.idx)
-                    if self.protein:
-                        mol_donors_res.append(residue.name[:3]+str(residue.OBResidue.GetNum()))
-                    vec = []
-                    for nbr_atom in [pybel.Atom(x) for x in OBAtomAtomIter(atom.OBAtom)]:
-                        if not nbr_atom.OBAtom.IsHbondDonorH():
-                            vec.append(np.array(nbr_atom.coords) - np.array(atom.coords))
-                    mol_donors_vec.append(vec)
-                    # salt
-                    if atom.type in ['N3+', 'N2+', 'Ng+']: # types from mol2 and Chimera, ref: http://www.cgl.ucsf.edu/chimera/docs/UsersGuide/idatm.html
-                        mol_salt_plus.append(atom.coords)
-                        mol_salt_plus_id.append(atom.idx)
-                        if self.protein:
-                            mol_salt_plus_res.append(residue.name[:3]+str(residue.OBResidue.GetNum()))
-                if atom.OBAtom.IsHbondAcceptor():
-                    mol_acceptors.append(atom.coords)
-                    mol_acceptors_id.append(atom.idx)
-                    if self.protein:
-                        mol_acceptors_res.append(residue.name[:3]+str(residue.OBResidue.GetNum()))
-                    vec = []
-                    for nbr_atom in [pybel.Atom(x) for x in OBAtomAtomIter(atom.OBAtom)]:
-                        if not nbr_atom.OBAtom.IsHbondDonorH():
-                            vec.append(np.array(nbr_atom.coords) - np.array(atom.coords))
-                    mol_acceptors_vec.append(vec)
-                    # salt
-                    if atom.type in ['O3-', '02-' 'O-']: # types from mol2 and Chimera, ref: http://www.cgl.ucsf.edu/chimera/docs/UsersGuide/idatm.html
-                        mol_salt_minus.append(atom.coords)
-                        mol_salt_minus_id.append(atom.idx)
-                        if self.protein:
-                            mol_salt_minus_res.append(residue.name[:3]+str(residue.OBResidue.GetNum()))
-
-                # protein metal
-                if atom.OBAtom.IsMetal():
-                    mol_metal.append(atom.coords)
-                    mol_metal_id.append(atom.idx)
-                    if self.protein:
-                        mol_metal_res.append(residue.name[:3]+str(residue.OBResidue.GetNum()))
-                
-                # halogens
-                if atom.atomicnum in [9,17,35,53]:
-                    mol_halogen.append(atom.coords)
-                    mol_halogen_id.append(atom.idx)
-                    if self.protein:
-                        mol_halogen_res.append(residue.name[:3]+str(residue.OBResidue.GetNum()))
-                    vec = []
-                    for nbr_atom in [pybel.Atom(x) for x in OBAtomAtomIter(atom.OBAtom)]:
-                        vec.append(nbr_atom.coords)
-                    mol_halogen_vec.append(vec)
-                    
-
-        
-            # Pi-rings
-            for ring in self.mol.sssr:
-                residue = self.mol.atoms[ring._path[0]-1].OBAtom.GetResidue()
-                if residue.GetAminoAcidProperty(3): # get aromatic aa
-                    ring_coords = []
-                    for atom_idx in ring._path:
-                        ring_coords.append(self.mol.atoms[atom_idx-1].coords)
-                    ring_coords = np.array(ring_coords)
-                    ring_center = np.mean(np.array(ring_coords), axis=0)
-                    # get mean perpendicular vector to the ring
-                    ring_vector = []
-                    for i in range(len(ring_coords)):
-                        ring_vector.append(np.cross([ring_coords[i] - ring_coords[i-1]],[ring_coords[i-1] - ring_coords[i-2]]))
-                    mol_pi.append(ring_center)
-                    mol_pi_id.append(ring._path)
-                    mol_pi_vec.append(ring_center + np.mean(ring_vector, axis=0))
-                    if self.protein:
-                        mol_pi_res.append(residue.GetName()[:3]+str(residue.GetNum()))
-        # if not protein
-        else:
-            for atom, residue in atoms:
-                # hydrophobe            
-                if atom.atomicnum == 6:
-                    hydrophobe = True
-                    for nbr_atom in OBAtomAtomIter(atom.OBAtom):
-                        if nbr_atom.GetAtomicNum() != 6 and nbr_atom.GetAtomicNum() != 1:
-                            hydrophobe = False
-                            break
-                    if hydrophobe:
-                        mol_hydrophobe.append(atom.coords)
-                        mol_hydrophobe_id.append(atom.idx)
-                # hbond
-                if atom.OBAtom.IsHbondDonor():
-                    mol_donors.append(atom.coords)
-                    mol_donors_id.append(atom.idx)
-                    vec = []
-                    for nbr_atom in [pybel.Atom(x) for x in OBAtomAtomIter(atom.OBAtom)]:
-                        if not nbr_atom.OBAtom.IsHbondDonorH():
-                            vec.append(np.array(nbr_atom.coords) - np.array(atom.coords))
-                    mol_donors_vec.append(vec)
-                
-                    # salt    
-                    if atom.type in ['N3+', 'N2+', 'Ng+']: # types from mol2 and Chimera, ref: http://www.cgl.ucsf.edu/chimera/docs/UsersGuide/idatm.html
-                        mol_salt_plus.append(atom.coords)
-                        mol_salt_plus_id.append(atom.idx)
-        
-                if atom.OBAtom.IsHbondAcceptor():
-                    mol_acceptors.append(atom.coords)
-                    mol_acceptors_id.append(atom.idx)
-                    vec = []
-                    for nbr_atom in [pybel.Atom(x) for x in OBAtomAtomIter(atom.OBAtom)]:
-                        if not nbr_atom.OBAtom.IsHbondDonorH():
-                            vec.append(np.array(nbr_atom.coords) - np.array(atom.coords))
-                    mol_acceptors_vec.append(vec)
-
-                    # salt
-                    if atom.type in ['O3-', '02-' 'O-']: # types from mol2 and Chimera, ref: http://www.cgl.ucsf.edu/chimera/docs/UsersGuide/idatm.html
-                        mol_salt_minus.append(atom.coords)
-                        mol_salt_minus_id.append(atom.idx)
-                # metals            
-                if atom.OBAtom.IsMetal():
-                    mol_metal.append(atom.coords)
-                    mol_metal_id.append(atom.idx)
-            
-                # halogens
-                if atom.atomicnum in [9,17,35,53]:
-                    mol_halogen.append(atom.coords)
-                    mol_halogen_id.append(atom.idx)
-    #                mol_halogen_res.append(residue.name[:3]+str(residue.OBResidue.GetNum()))
-                    vec = []
-                    for nbr_atom in [pybel.Atom(x) for x in OBAtomAtomIter(atom.OBAtom)]:
-                        vec.append(nbr_atom.coords)
-                    mol_halogen_vec.append(vec)
-                    
-            # Pi-rings
-            for ring in self.mol.sssr:
-                if ring.IsAromatic():
-                    ring_coords = []
-                    for atom_idx in ring._path:
-                        ring_coords.append(self.mol.atoms[atom_idx-1].coords)
-                    ring_coords = np.array(ring_coords)
-                    ring_center = np.mean(np.array(ring_coords), axis=0)
-                    # get mean perpendicular vector to the ring
-                    ring_vector = []
-                    for i in range(len(ring_coords)):
-                        ring_vector.append(np.cross([ring_coords[i] - ring_coords[i-1]],[ring_coords[i-1] - ring_coords[i-2]]))
-                    mol_pi.append(ring_center)
-                    mol_pi_id.append(ring._path)
-                    mol_pi_vec.append(ring_center + np.mean(ring_vector, axis=0))
-    #                mol_pi_res.append(residue.GetName()[:3]+str(residue.GetNum()))
-
-        # make dictionaries public
-        self.donors = np.array(mol_donors)
-        self.donors_id = mol_donors_id
-        self.donors_vec = mol_donors_vec
-        self.donors_res = mol_donors_res
-        
-        self.acceptors = np.array(mol_acceptors)
-        self.acceptors_id = mol_acceptors_id
-        self.acceptors_vec = mol_acceptors_vec
-        self.acceptors_res = mol_acceptors_res
-        
-        self.salt_plus = np.array(mol_salt_plus)
-        self.salt_plus_id = mol_salt_plus_id
-        self.salt_plus_res = mol_salt_plus_res
-        
-        self.salt_minus = np.array(mol_salt_minus)
-        self.salt_minus_id = mol_salt_minus_id
-        self.salt_minus_res = mol_salt_minus_res
-        
-        self.hydrophobe = np.array(mol_hydrophobe)
-        self.hydrophobe_id = mol_hydrophobe_id
-        self.hydrophobe_res = mol_hydrophobe_res
-        
-        self.metal = np.array(mol_metal)
-        self.metal_id = mol_metal_id
-        self.metal_res = mol_metal_res
-        
-        self.halogen = np.array(mol_halogen)
-        self.halogen_id = mol_halogen_id
-        self.halogen_vec = mol_halogen_vec
-        self.halogen_res = mol_halogen_res
-        
-        self.pi = np.array(mol_pi)
-        self.pi_id = mol_pi_id
-        self.pi_vec = mol_pi_vec
-        self.pi_res = mol_pi_res
-        
-
-
-
-def hbond_acceptor_donor(mol1, mol2):
-    hbonds = []
-    hbonds_crude = []
-    
-    if len(mol1.acceptors) > 0 and len(mol2.donors) > 0:
-        for mol1_atom, mol2_atom in np.argwhere(distance(mol1.acceptors, mol2.donors) < hbond_cutoff):
-            hbond = True # assume that ther is hbond, than check angles
-            for v_an in mol1.acceptors_vec[mol1_atom]:
-                for v_dn in mol2.donors_vec[mol2_atom]:
-                    v_da = mol2.donors[mol2_atom] - mol1.acceptors[mol1_atom]
-                    v_ad = mol1.acceptors[mol1_atom] - mol2.donors[mol2_atom]
-                    # check if hbond should be discarded
-                    if angle(v_an, v_ad) < 120/len(mol1.acceptors_vec[mol1_atom]) - hbond_tolerance or angle(v_da, v_dn) < 120/len(mol2.donors_vec[mol2_atom]) - hbond_tolerance:
-                        hbond = False
-                        break
-                if not hbond:
-                    break
-            if hbond:
-                hbonds.append({'atom_id': [mol1.acceptors_id[mol1_atom],  mol2.donors_id[mol2_atom]], 'res_names': [mol1.acceptors_res[mol1_atom] if mol1.protein == True else '', mol2.donors_res[mol2_atom] if mol2.protein == True else '']})
-            else:
-                hbonds_crude.append({'atom_id': [mol1.acceptors_id[mol1_atom],  mol2.donors_id[mol2_atom]], 'res_names': [mol1.acceptors_res[mol1_atom] if mol1.protein == True else '', mol2.donors_res[mol2_atom] if mol2.protein == True else '']})
-
-    return hbonds, hbonds_crude
-
-def hbond(mol1, mol2):
-    (h1, h1_crude) = hbond_acceptor_donor(mol1, mol2)
-    (h2, h2_crude) = hbond_acceptor_donor(mol2, mol1)
-    return h1 + h2, h1_crude + h2_crude
-
-def pi_stacking(mol1, mol2):
-    pi_stacking = []
-    if len(mol1.pi) > 0 and len(mol2.pi) > 0:
-        for mol1_atom, mol2_atom in np.argwhere(distance(mol1.pi, mol2.pi) < pi_cutoff):
-                v_mol1 = mol1.pi_vec[mol1_atom] - mol1.pi[mol1_atom]
-                v_centers = mol2.pi[mol2_atom] - mol1.pi[mol1_atom]
-                v_mol2 = mol2.pi_vec[mol2_atom] - mol2.pi[mol2_atom]
-                # check angles for face to face, and edge to face
-                if (angle(v_mol1, v_centers) < pi_tolerance or angle(v_mol1, v_centers) > 180 - pi_tolerance) and (angle(v_mol2, v_mol1) < pi_tolerance or angle(v_mol2, v_mol1) > 180 - pi_tolerance or np.abs(angle(v_mol2, v_mol1) - 90) < pi_tolerance):
-                    pi_stacking.append({'atom_id': [mol1.pi_id[mol1_atom],  mol2.pi_id[mol2_atom]], 'res_names': [mol1.pi_res[mol1_atom] if mol1.protein == True else '', mol2.pi_res[mol2_atom] if mol2.protein == True else '']})
-    return pi_stacking
-
-def salt_bridges(mol1, mol2):
-    salt_bridges = []
-    if len(mol1.salt_minus) > 0 and len(mol2.salt_plus) > 0:
-        for mol1_atom, mol2_atom in np.argwhere(distance(mol1.salt_minus, mol2.salt_plus) < salt_bridge_cutoff):
-            salt_bridges.append({'atom_id': [mol1.salt_minus_id[mol1_atom],  mol2.salt_plus_id[mol2_atom]], 'res_names': [mol1.salt_minus_res[mol1_atom] if mol1.protein == True else '', mol2.salt_plus_res[mol2_atom] if mol2.protein == True else '']})
-    if len(mol1.salt_plus) and len(mol2.salt_minus) > 0:
-        for mol1_atom, mol2_atom in np.argwhere(distance(mol1.salt_plus, mol2.salt_minus) < salt_bridge_cutoff):
-            salt_bridges.append({'atom_id': [mol1.salt_plus_id[mol1_atom],  mol2.salt_minus_id[mol2_atom]], 'res_names': [mol1.salt_plus_res[mol1_atom] if mol1.protein == True else '', mol2.salt_minus_res[mol2_atom] if mol2.protein == True else '']})
-    return salt_bridges
-
-def hydrophobic_contacts(mol1, mol2):
-    hydrophobic_contacts = []
-    if len(mol1.hydrophobe) > 0 and len(mol2.hydrophobe) > 0:
-        for mol1_atom, mol2_atom in np.argwhere(distance(mol1.hydrophobe, mol2.hydrophobe) < hydrophobe_cutoff):
-            hydrophobic_contacts.append({'atom_id': [mol1.hydrophobe_id[mol1_atom],  mol2.hydrophobe_id[mol2_atom]], 'res_names': [mol1.hydrophobe_res[mol1_atom] if mol1.protein == True else '', mol2.hydrophobe_res[mol2_atom] if mol2.protein == True else '']})
-    return hydrophobic_contacts
-
-
-def pi_cation(mol1, mol2):
-    pi_cation = []
-    if len(mol1.salt_plus) > 0 and len(mol2.pi) > 0:
-        for mol1_atom, mol2_atom in np.argwhere(distance(mol1.salt_plus, mol2.pi) < pi_cation_cutoff):
-            v_pi = mol2.pi_vec[mol2_atom] - mol2.pi[mol2_atom]
-            v_cat = mol1.salt_plus[mol1_atom] - mol2.pi[mol2_atom]
-            if angle(v_pi, v_cat) < pi_tolerance or angle(v_pi, v_cat) > 180 - pi_tolerance:
-                pi_cation.append({'atom_id': [mol1.salt_plus_id[mol1_atom],  mol2.pi_id[mol2_atom]], 'res_names': [mol1.salt_plus_res[mol1_atom] if mol1.protein == True else '', mol2.pi_res[mol2_atom] if mol2.protein == True else '']})
-    if len(mol1.pi) > 0 and len(mol2.salt_plus) > 0:
-        for mol1_atom, mol2_atom in np.argwhere(distance(mol1.pi, mol2.salt_plus) < pi_cation_cutoff):
-            v_pi = mol1.pi_vec[mol1_atom] - mol1.pi[mol1_atom]
-            v_cat = mol2.salt_plus[mol2_atom] - mol1.pi[mol1_atom]
-            if angle(v_pi, v_cat) < pi_tolerance or angle(v_pi, v_cat) > 180 - pi_tolerance:    
-                pi_cation.append({'atom_id': [mol1.pi_id[mol1_atom],  mol2.salt_plus_id[mol2_atom]], 'res_names': [mol1.pi_res[mol1_atom] if mol1.protein == True else '', mol2.salt_plus_res[mol2_atom] if mol2.protein == True else '']})
-    return pi_cation
-
-
-def metal_acceptor(mol1, mol2):
-    metal_coordination = []
-    metal_coordination_crude = []
-    if len(mol1.metal) > 0 and len(mol2.acceptors) > 0:
-        for mol1_atom, mol2_atom in np.argwhere(distance(mol1.metal, mol2.acceptors) < hbond_cutoff):
-            coord = True # assume that ther is hbond, than check angles
-            for v_an in mol2.acceptors_vec[mol2_atom]:
-                v_am = mol2.acceptors[mol2_atom] - mol1.metal[mol1_atom]
-                # check if hbond should be discarded
-                if angle(v_am, v_an) < 120/len(mol2.acceptors_vec[mol2_atom]) - hbond_tolerance:
-                    coord = False
-                    break    
-            if coord:
-                metal_coordination.append({'atom_id': [mol1.metal_id[mol1_atom],  mol2.acceptors_id[mol2_atom]], 'res_names': [mol1.metal_res[mol1_atom] if mol1.protein == True else '', mol2.acceptors_res[mol2_atom] if mol2.protein == True else '']})
-            else:
-                metal_coordination_crude.append({'atom_id': [mol1.metal_id[mol1_atom],  mol2.acceptors_id[mol2_atom]], 'res_names': [mol1.metal_res[mol1_atom] if mol1.protein == True else '', mol2.acceptors_res[mol2_atom] if mol2.protein == True else '']})
-    return metal_coordination, metal_coordination_crude
-    
-        
-def metal_pi(mol1, mol2):
-    metal_coordination = []
-    metal_coordination_crude = []
-    if len(mol1.metal) > 0 and len(mol2.pi) > 0:
-        for mol1_atom, mol2_atom in np.argwhere(distance(mol1.metal, mol2.pi) < pi_cation_cutoff):
-            v_pi = mol2.pi_vec[mol2_atom] - mol2.pi[mol2_atom]
-            v_cat = mol1.metal[mol1_atom] - mol2.pi[mol2_atom]
-            if angle(v_pi, v_cat) < pi_tolerance or angle(v_pi, v_cat) > 180 - pi_tolerance:
-                metal_coordination.append({'atom_id': [mol1.metal_id[mol1_atom],  mol2.pi_id[mol2_atom]], 'res_names': [mol1.metal_res[mol1_atom] if mol1.protein == True else '', mol2.pi_res[mol2_atom] if mol2.protein == True else '']})
-            else:
-                metal_coordination_crude.append({'atom_id': [mol1.metal_id[mol1_atom],  mol2.pi_id[mol2_atom]], 'res_names': [mol1.metal_res[mol1_atom] if mol1.protein == True else '', mol2.pi_res[mol2_atom] if mol2.protein == True else '']})
-    return metal_coordination, metal_coordination_crude
-
-def metal_coordination(mol1, mol2):
-    (m1, m1_crude) = metal_acceptor(mol1, mol2)
-    (m2, m2_crude) = metal_acceptor(mol2, mol1)
-    (m3, m3_crude) = metal_pi(mol1, mol2)
-    (m4, m4_crude) = metal_pi(mol2, mol1)
-    return m1+m2+m3+m4, m1_crude+m2_crude+m3_crude+m4_crude
-
-def halogenbond_acceptor_halogen(mol1, mol2):
-    halogenbonds = []
-    halogenbonds_crude = []
-    
-    if len(mol1.acceptors) > 0 and len(mol2.halogen) > 0:
-        for mol1_atom, mol2_atom in np.argwhere(distance(mol1.acceptors, mol2.halogen) < halogenbond_cutoff):
-            hbond = True # assume that ther is hydrogenbond, than check angles
-            for v_an in mol1.acceptors_vec[mol1_atom]:
-                for v_hn in mol2.halogen_vec[mol2_atom]:
-                    v_ha = mol2.halogen[mol2_atom] - mol1.acceptors[mol1_atom]
-                    v_ah = mol1.acceptors[mol1_atom] - mol2.halogen[mol2_atom]
-                    # check if hbond should be discarded
-                    if angle(v_an, v_ah) < 120/len(mol1.acceptors_vec[mol1_atom]) - halogenbond_tolerance or angle(v_ha, v_hn) < 150/len(mol2.halogen_vec[mol2_atom]) - halogenbond_tolerance:
-                        hbond = False
-                        break
-                if not hbond:
-                    break
-            if hbond:
-                halogenbonds.append({'atom_id': [mol1.acceptors_id[mol1_atom],  mol2.halogen_id[mol2_atom]], 'res_names': [mol1.acceptors_res[mol1_atom] if mol1.protein == True else '', mol2.halogen_res[mol2_atom] if mol2.protein == True else '']})
-            else:
-                halogenbonds_crude.append({'atom_id': [mol1.acceptors_id[mol1_atom],  mol2.halogen_id[mol2_atom]], 'res_names': [mol1.acceptors_res[mol1_atom] if mol1.protein == True else '', mol2.halogen_res[mol2_atom] if mol2.protein == True else '']})
-
-    return halogenbonds, halogenbonds_crude
-
-def halogenbond(mol1, mol2):
-    (h1, h1_crude) = halogenbond_acceptor_halogen(mol1, mol2)
-    (h2, h2_crude) = halogenbond_acceptor_halogen(mol2, mol1)
-    return h1 + h2, h1_crude + h2_crude
-
-
-def angle_3p(p1,p2,p3):
-    """ Return an angle from 3 points in cartesian space (point #2 is centroid) """
-    v1 = p1-p2
-    v2 = p3-p2
-    return angle(v1,v2)
-
-def angle(v1, v2):
-    """ Return an angle between two vectors in degrees """
-    dot = (v1*v2).sum(axis=-1) # better than np.dot(v1, v2), multiple vectors can be applied
-    norm = np.linalg.norm(v1, axis=-1)* np.linalg.norm(v2, axis=-1)
-    return np.degrees(np.arccos(dot/norm))
-
-def dihedral(p1,p2,p3,p4):
-    """ Calculate dihedral from 4 points """
-    v12 = (p1-p2)/np.linalg.norm(p1-p2)
-    v23 = (p2-p3)/np.linalg.norm(p2-p3)
-    v34 = (p3-p4)/np.linalg.norm(p3-p4)
-    c1 = np.cross(v12, v23)
-    c2 = np.cross(v23, v34)
-    out = angle(c1, c2)
-    # check clockwise and anti-
-    n1 = c1/np.linalg.norm(c1)
-    mask = (n1*v34).sum(axis=-1) > 0
-    if len(mask.shape) == 0:
-        if mask:
-            out = -out
+def close_contacts(x, y, cutoff, x_column = 'coords', y_column = 'coords'):
+    """ Returns pairs of close contacts atoms within cutoff. """
+    if len(x[x_column]) > 0 and len(x[x_column]) > 0:
+        index = np.argwhere(distance(x[x_column], y[y_column]) < cutoff)
+        return x[index[:,0]], y[index[:,1]]
     else:
-        out[mask] = -out[mask]
-    return out
+        return x[[]], y[[]]
 
+def hbond_acceptor_donor(mol1, mol2, cutoff = 3.5, base_angle = 120, tolerance = 30):
+    a, d = close_contacts(mol1.atom_dict[mol1.atom_dict['isacceptor']], mol2.atom_dict[mol2.atom_dict['isdonor']], cutoff)
+    #skip empty values
+    if len(a) > 0 and len(d) > 0:
+        angle1 = angle(d['coords'][:,np.newaxis,:],a['coords'][:,np.newaxis,:],a['neighbors'])
+        angle2 = angle(a['coords'][:,np.newaxis,:],d['coords'][:,np.newaxis,:],d['neighbors'])
+        a_neighbors_num = np.sum(~np.isnan(a['neighbors'][:,:,0]), axis=-1)[:,np.newaxis]
+        d_neighbors_num = np.sum(~np.isnan(d['neighbors'][:,:,0]), axis=-1)[:,np.newaxis]
+        strict = (((angle1>(base_angle/a_neighbors_num-tolerance)) | np.isnan(angle1)) & ((angle2>(base_angle/d_neighbors_num-tolerance)) | np.isnan(angle2))).all(axis=-1)
+        return a, d, strict
+    else:
+        return a, d, np.array([], dtype=bool) 
+    
+def hbond(mol1, mol2, cutoff = 3.5, tolerance = 30):
+    a1, d1, s1 = hbond_acceptor_donor(mol1, mol2, cutoff = cutoff, tolerance = tolerance)
+    a2, d2, s2 = hbond_acceptor_donor(mol2, mol1, cutoff = cutoff, tolerance = tolerance)
+    return np.concatenate((a1, a2)), np.concatenate((d1, d2)), np.concatenate((s1, s2))
 
+def halogenbond_acceptor_halogen(mol1, mol2, base_angle_acceptor = 120, base_angle_halogen = 180, tolerance = 30, cutoff = 4):
+    a, h = close_contacts(mol1.atom_dict[mol1.atom_dict['isacceptor']], mol2.atom_dict[mol2.atom_dict['ishalogen']], cutoff)
+    #skip empty values
+    if len(a) > 0 and len(h) > 0:
+        angle1 = angle(h['coords'][:,np.newaxis,:],a['coords'][:,np.newaxis,:],a['neighbors'])
+        angle2 = angle(a['coords'][:,np.newaxis,:],h['coords'][:,np.newaxis,:],h['neighbors'])
+        a_neighbors_num = np.sum(~np.isnan(a['neighbors'][:,:,0]), axis=-1)[:,np.newaxis]
+        h_neighbors_num = np.sum(~np.isnan(h['neighbors'][:,:,0]), axis=-1)[:,np.newaxis]
+        strict = (((angle1>(base_angle_acceptor/a_neighbors_num-tolerance)) | np.isnan(angle1)) & ((angle2>(base_angle_halogen/h_neighbors_num-tolerance)) | np.isnan(angle2))).all(axis=-1)
+        return a, h, strict
+    else:
+        return a, h, np.array([], dtype=bool)
+
+def halogenbond(mol1, mol2, base_angle_acceptor = 120, base_angle_halogen = 180, tolerance = 30, cutoff = 4):
+    a1, h1, s1 = halogenbond_acceptor_halogen(mol1, mol2, base_angle_acceptor = base_angle_acceptor, base_angle_halogen = base_angle_halogen, tolerance = tolerance, cutoff = cutoff)
+    a2, h2, s2 = halogenbond_acceptor_halogen(mol2, mol1, base_angle_acceptor = base_angle_acceptor, base_angle_halogen = base_angle_halogen, tolerance = tolerance, cutoff = cutoff)
+    return np.concatenate((a1, a2)), np.concatenate((h1, h2)), np.concatenate((s1, s2))
+
+def pi_stacking(mol1, mol2, cutoff = 5, tolerance = 30):
+    r1, r2 = close_contacts(mol1.ring_dict, mol2.ring_dict, cutoff, x_column = 'centroid', y_column = 'centroid')
+    if len(r1) == 0 or len(r2) == 0:
+        angle1 = angle_2v(r1['vector'],r2['vector'])
+        angle2 = angle(r1['vector'] + r1['centroid'],r1['centroid'], r2['centroid'])
+        strict = ((angle1 > 180 - tolerance) | (angle1 < tolerance) | (angle2 > 90 - tolerance)) & ((angle2 > 180 - tolerance) | (angle1 < tolerance))
+        return r1, r2, strict
+    else:
+        return r1, r2, np.array([], dtype=bool)
+
+def salt_bridge_plus_minus(mol1, mol2, cutoff = 4):
+    m1_plus, m2_minus = close_contacts(mol1.atom_dict[mol1.atom_dict['isplus']], mol2.atom_dict[mol2.atom_dict['isminus']], cutoff)
+    return m1_plus, m2_minus
+
+def salt_bridges(mol1, mol2, cutoff = 4):
+    m1_plus, m2_minus = salt_bridge_plus_minus(mol1, mol2, cutoff = cutoff)
+    m2_plus, m1_minus = salt_bridge_plus_minus(mol2, mol1, cutoff = cutoff)
+    return np.concatenate((m1_plus, m1_minus)), np.concatenate((m2_minus, m2_plus))
+
+def hydrophobic_contacts(mol1, mol2, cutoff = 4):
+    h1, h2 = close_contacts(mol1.atom_dict[mol1.atom_dict['ishydrophobe']], mol2.atom_dict[mol2.atom_dict['ishydrophobe']], cutoff)
+    return h1, h2
+
+def pi_cation(mol1, mol2, cutoff = 5, tolerance = 30):
+    r1, plus2 = close_contacts(mol1.ring_dict, mol2.atom_dict[mol2.atom_dict['isplus']], cutoff, x_column='centroid')
+    if len(r1) > 0 and len(plus2) > 0:
+        angle1 = angle_2v(r1['vector'], plus2['coords'] - r1['centroid'])
+        strict = (angle1 > 180 - tolerance) | (angle1 < tolerance)
+        return r1, plus2, strict
+    else:
+        return r1, plus2, np.array([], dtype=bool)
+
+def acceptor_metal(mol1, mol2, base_angle = 120, tolerance = 30, cutoff = 4):
+    a, m = close_contacts(mol1.atom_dict[mol1.atom_dict['isacceptor']], mol2.atom_dict[mol2.atom_dict['ismetal']], cutoff)
+    #skip empty values
+    if len(a) > 0 and len(m) > 0:
+        angle1 = angle(m['coords'][:,np.newaxis,:],a['coords'][:,np.newaxis,:],a['neighbors'])
+        a_neighbors_num = np.sum(~np.isnan(a['neighbors'][:,:,0]), axis=-1)[:,np.newaxis]
+        strict = ((angle1>(base_angle/a_neighbors_num-tolerance)) | np.isnan(angle1)).all(axis=-1)
+        return a, m, strict
+    else:
+        return a, m, np.array([], dtype=bool)
+
+def pi_metal(mol1, mol2, cutoff = 5, tolerance = 30):
+    r1, m = close_contacts(mol1.ring_dict, mol2.atom_dict[mol2.atom_dict['ismetal']], cutoff, x_column='centroid')
+    if len(r1) > 0 and len(m) > 0:
+        angle1 = angle_2v(r1['vector'], m['coords'] - r1['centroid'])
+        strict = (angle1 > 180 - tolerance) | (angle1 < tolerance)
+        return r1, m, strict
+    else:
+        return r1, m, np.array([], dtype=bool)
+
+## TODO # probably delete it, just for benchmarking' sake
+def metal_coordination(mol1, mol2):
+    m1 = acceptor_metal(mol1, mol2)
+    m2 = acceptor_metal(mol2, mol1)
+    m3 = pi_metal(mol1, mol2)
+    m4 = pi_metal(mol2, mol1)
+    return False
