@@ -1,11 +1,11 @@
 import numpy as np
 from openbabel import OBAtomAtomIter
-import pybel
+import toolkits.ob as toolkit
 
 # hash OB!
-pybel.ob.obErrorLog.StopLogging()
+toolkit.ob.obErrorLog.StopLogging()
 
-class Molecule(pybel.Molecule):
+class Molecule(toolkit.Molecule):
     def __init__(self, molecule, protein = False):
         # call parent constructor
         super(Molecule,self).__init__(molecule.OBMol)
@@ -16,7 +16,7 @@ class Molecule(pybel.Molecule):
         # percieve chains in residues
         #if len(res_dict) > 1 and not molecule.OBMol.HasChainsPerceived():
         #    print "Dirty HACK"
-        #    molecule = pybel.readstring('pdb', molecule.write('pdb'))
+        #    molecule = toolkit.readstring('pdb', molecule.write('pdb'))
         
         self._atom_dict = None
         self._res_dict = None
@@ -86,7 +86,7 @@ class Molecule(pybel.Molecule):
             coords = atom.coords
             
             if self.protein:
-                residue = pybel.Residue(atom.OBAtom.GetResidue())
+                residue = toolkit.Residue(atom.OBAtom.GetResidue())
             else:
                 residue = False
             
