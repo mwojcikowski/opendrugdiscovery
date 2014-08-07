@@ -51,7 +51,9 @@ class autodock_vina:
             # write ligand to file
             ligand_file = ligand_dir + '/' + str(n) + '.pdbqt'
             ligand.write('pdbqt', ligand_file, overwrite=True)
-            output_array.append(parse_vina_scoring_output(subprocess.check_output([self.executable, '--score_only', '--receptor', protein_file, '--ligand', ligand_file] + self.params)))
+            scores = parse_vina_scoring_output(subprocess.check_output([self.executable, '--score_only', '--receptor', protein_file, '--ligand', ligand_file] + self.params))
+            ligand.data.update(scores)
+            output_array.append(ligand)
         rmtree(tmp_dir)
         return output_array
             
@@ -69,7 +71,9 @@ class autodock_vina:
             ligand_outfile = ligand_dir + '/' + str(n) + '_out.pdbqt'
             ligand.write('pdbqt', ligand_file, overwrite=True)
             vina = parse_vina_docking_output(subprocess.check_output([self.executable, '--receptor', protein_file, '--ligand', ligand_file, '--out', ligand_outfile] + self.params))
-            output_array.append(zip([lig for lig in pybel.readfile('pdbqt', ligand_outfile)], vina))
+            for lig, scores in zip([lig for lig in pybel.readfile('pdbqt', ligand_outfile)], vina):
+                lig.data.update(scores)
+                output_array.append(lig)
         rmtree(tmp_dir)
         return output_array
     
@@ -81,7 +85,7 @@ def parse_vina_scoring_output(output):
             m = line.replace(' ','').split(':')
             if m[0] == 'Affinity':
                 m[1] = m[1].replace('(kcal/mol)','')
-            out[m[0].lower()] = float(m[1])
+            out['vina_'+m[0].lower()] = float(m[1])
     return out
     
 def parse_vina_docking_output(output):
@@ -90,6 +94,6 @@ def parse_vina_docking_output(output):
     for line in output.split('\n')[13:]: # skip some output
         if r.match(line):
             s = line.split()
-            out.append({'affinity': s[1], 'rmsd_lb': s[2], 'rmsd_ub': s[3]})
+            out.append({'vina_affinity': s[1], 'vina_rmsd_lb': s[2], 'vina_rmsd_ub': s[3]})
     return out
     
