@@ -17,7 +17,7 @@ class neuralnetwork:
                 conec = mlgraph(shapebiases)
             self.model = ffnet(conec)
     
-    def train(self, input_descriptors, target_values, train_alg='tnc'):
+    def fit(self, input_descriptors, target_values, train_alg='tnc'):
         getattr(self.model, 'train_'+train_alg)(input_descriptors, target_values, maxfun=10000)
     
     def predict(self, input_descriptors):
