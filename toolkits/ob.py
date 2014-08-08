@@ -193,6 +193,26 @@ class Molecule(pybel.Molecule):
 ### Extend pybel.Molecule
 pybel.Molecule = Molecule
 
+class Fingerprint(pybel.Fingerprint):
+    @property
+    def raw(self):
+        return _unrollbits(self.fp, pybel.ob.OBFingerprint.Getbitsperint())
+
+def _unrollbits(fp, bitsperint):
+    """ Unroll unsigned int fingerprint to bool """
+    ans = np.zeros(len(fp)*bitsperint, dtype=bool)
+    start = 1
+    for x in fp:
+        i = start
+        while x > 0:
+            ans[i] = x % 2
+            x >>= 1
+            i += 1
+        start += bitsperint
+    return ans
+
+pybel.Fingerprint = Fingerprint
+
 ### Monkeypatch pybel objects pickling
 pickle_format = 'mol2'
 def pickle_mol(self):
