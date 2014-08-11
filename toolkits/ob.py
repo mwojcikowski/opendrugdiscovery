@@ -25,8 +25,23 @@ class Molecule(pybel.Molecule):
         self._atom_dict = None
         self._res_dict = None
         self._ring_dict = None
+        self._coords = None
+        self._charges = None
         
-        
+    # cache frequently used properties and cache them in prefixed [_] variables
+    @property
+    def coords(self):
+        if self._coords is None:
+            self._coords = np.array([atom.coords for atom in self.mol])
+        return self._coords
+    
+    @property
+    def charges(self):
+        if self._charges is None:
+            self._charges = np.array([atom.partialcharge for atom in self.mol])
+        return self._charges
+    
+    #### Custom ODDT properties ####
     @property
     def atom_dict(self):
         # check cache and generate dicts
