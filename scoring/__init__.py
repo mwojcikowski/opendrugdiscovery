@@ -2,9 +2,9 @@ import numpy as np
 from sklearn.cross_validation import cross_val_score
 from sklearn.externals import joblib as pickle
 
-class scorer:
-    def __init__(self, model, descriptor_generator, model_opts, desc_opts):
-        self.model = model(**model_opts)
+class scorer(object):
+    def __init__(self, model, descriptor_generator, model_opts = {}, desc_opts = {}):
+        self.model = model()
         self.descriptor_generator = descriptor_generator(**desc_opts)
         
     def fit(self, ligands, target):

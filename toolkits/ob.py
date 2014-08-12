@@ -6,6 +6,8 @@ from openbabel import OBAtomAtomIter
 
 from .. import angle,angle_2v,dihedral
 
+backend = 'ob'
+
 # hash OB!
 pybel.ob.obErrorLog.StopLogging()
 
