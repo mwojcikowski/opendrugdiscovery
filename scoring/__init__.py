@@ -3,9 +3,9 @@ from sklearn.cross_validation import cross_val_score
 from sklearn.externals import joblib as pickle
 
 class scorer(object):
-    def __init__(self, model, descriptor_generator, model_opts = {}, desc_opts = {}):
-        self.model = model()
-        self.descriptor_generator = descriptor_generator(**desc_opts)
+    def __init__(self, model_instance, descriptor_generator_instance):
+        self.model = model_instance
+        self.descriptor_generator = descriptor_generator_instance
         
     def fit(self, ligands, target):
         self.train_descs = self.descriptor_generator.build(ligands)
