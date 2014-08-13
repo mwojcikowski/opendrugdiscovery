@@ -58,7 +58,7 @@ def atoms_by_type(atom_dict, types, mode = 'atomic_nums'):
                  raise ValueError('Unsopported atom type: %s' % t)
         return out
 
-class close_contacts:
+class close_contacts(object):
     def __init__(self, protein = None, cutoff = 4, mode = 'atomic_nums', ligand_types = None, protein_types = None, aligned_pairs = False):
         self.cutoff = cutoff
         self.protein = protein
@@ -82,7 +82,7 @@ class close_contacts:
             out = np.vstack((out, desc))
         return out[1:]
         
-class fingerprints:
+class fingerprints(object):
     def __init__(self, fp = 'fp2', toolkit = 'ob'):
         self.fp = fp
         self.exchange = False
@@ -105,3 +105,38 @@ class fingerprints:
                 out = np.zeros_like(fp)
             out = np.vstack((fp, out))
         return out[1:]
+        
+class binana_descriptor:
+    def __init__(self, protein):
+        self.protein = protein
+    
+    def build(self, ligands, protein = None):
+        if protein is None:
+            protein = self.protein
+        vec_size = 99999
+        # Vina
+        
+        # Close Contacts 4
+        
+        # Electrostatics
+        
+        # Ligand Atom Types
+        
+        # Close Contacts 2.5
+        
+        # H-Bonds
+        
+        # Hydrophobic contacts
+        
+        # Pi-stacking
+        
+        # Pi-cation
+        
+        # T-shape (perpendicular Pi's)
+        
+        # Active site flexibility
+        
+        # Salt bridges
+        
+        # Rotatable bonds
+        
