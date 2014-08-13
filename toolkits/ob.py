@@ -49,6 +49,10 @@ class Molecule(pybel.Molecule):
     
     #### Custom ODDT properties ####
     @property
+    def num_rotors(self):
+        return self.OBMol.NumRotors()
+    
+    @property
     def atom_dict(self):
         # check cache and generate dicts
         if self._atom_dict is None:
