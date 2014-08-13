@@ -2,11 +2,15 @@ import pybel
 from pybel import *
 import copy_reg
 import numpy as np
-from openbabel import OBAtomAtomIter
+from openbabel import OBAtomAtomIter,OBTypeTable
 
 from .. import angle,angle_2v,dihedral
 
 backend = 'ob'
+# setup typetable to translate atom types
+typetable = OBTypeTable()
+typetable.SetFromType('INT')
+typetable.SetToType('SYB')
 
 # hash OB!
 pybel.ob.obErrorLog.StopLogging()
@@ -72,7 +76,7 @@ class Molecule(pybel.Molecule):
                  ('coords', 'float16', 3),
                  ('charge', 'float16'),
                  ('atomicnum', 'int8'),
-                 ('atomtype','a3'),
+                 ('atomtype','a4'),
                  ('hybridization', 'int8'),
                  ('neighbors', 'float16', (4,3)), # non-H neighbors coordinates for angles (max of 6 neighbors should be enough)
                  # residue info
@@ -82,6 +86,7 @@ class Molecule(pybel.Molecule):
                  # atom properties
                  ('isacceptor', 'bool'),
                  ('isdonor', 'bool'),
+                 ('isdonorh', 'bool'),
                  ('ismetal', 'bool'),
                  ('ishydrophobe', 'bool'),
                  ('isaromatic', 'bool'),
@@ -94,15 +99,15 @@ class Molecule(pybel.Molecule):
                  ]
 
         a = []
-        atom_dict = np.empty(self.OBMol.NumHvyAtoms(), dtype=atom_dtype)
+        atom_dict = np.empty(self.OBMol.NumAtoms(), dtype=atom_dtype)
         i = 0
-        for atom in self:
+        for atom in self.atoms:
             
             atomicnum = atom.atomicnum
-            # skip hydrogens for performance
-            if atomicnum == 1:
-                continue
-            atomtype = atom.type
+            # skip non-polar hydrogens for performance
+#            if atomicnum == 1 and atom.OBAtom.IsNonPolarHydrogen():
+#                continue
+            atomtype = typetable.Translate(atom.type) # sybyl atom type
             partialcharge = atom.partialcharge
             coords = atom.coords
             
@@ -119,8 +124,8 @@ class Molecule(pybel.Molecule):
             n = 0
             for nbr_atom in [x for x in OBAtomAtomIter(atom.OBAtom)]:
                 nbr_atomicnum = nbr_atom.GetAtomicNum()
-                if nbr_atomicnum == 1:
-                    continue
+#                if nbr_atomicnum == 1:
+#                    continue
                 neighbors[n] = ((nbr_atom.GetX(), nbr_atom.GetY(), nbr_atom.GetZ()), nbr_atomicnum)
                 n += 1
             atom_dict[i] = (atom.idx,
@@ -137,6 +142,7 @@ class Molecule(pybel.Molecule):
                       # atom properties
                       atom.OBAtom.IsHbondAcceptor(),
                       atom.OBAtom.IsHbondDonor(),
+                      atom.OBAtom.IsHbondDonorH(),
                       atom.OBAtom.IsMetal(),
                       atomicnum == 6 and len(neighbors) > 0 and not (neighbors['atomicnum'] != 6).any(), #hydrophobe
                       atom.OBAtom.IsAromatic(),
