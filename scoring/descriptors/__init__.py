@@ -2,11 +2,13 @@ import numpy as np
 from scipy.spatial.distance import cdist as distance
 
 class close_contacts:
-    def __init__(self, protein = None, cutoff = 4, mode = 'atomic_nums', ligand_types = None, protein_types = None):
+    def __init__(self, protein = None, cutoff = 4, mode = 'atomic_nums', ligand_types = None, protein_types = None, aligned_pairs = False):
         self.cutoff = cutoff
         self.protein = protein
         self.ligand_types = ligand_types
         self.protein_types = protein_types if protein_types else ligand_types
+        self.aligned_pairs = aligned_pairs
+        
         if mode == 'atomic_nums':
             self.typer = self._atomic_nums
         elif mode == 'atom_types_sybyl':
@@ -23,12 +25,55 @@ class close_contacts:
         return {num: atom_dict[atom_dict['atomicnum'] == num] for num in atomic_nums}
     
     def _atom_types_sybyl(self, atom_dict, protein = False):
-        
-        return False
+        atom_types = self.protein_types if protein else self.ligand_types
+        return {t: atom_dict[atom_dict['atomtype'] == t] for t in atom_types}
     
-    def _atom_types_sybyl(self, atom_dict, protein = False):
-        
-        return False
+    def _atom_types_ad4(self, atom_dict, protein = False):
+        """
+        AutoDock4 types definition: http://autodock.scripps.edu/faqs-help/faq/where-do-i-set-the-autodock-4-force-field-parameters
+        """
+        atom_types = self.protein_types if protein else self.ligand_types
+        # all AD4 atom types are capitalized
+        atom_types = [i.upper() for i in atom_types]
+        out = {}
+        for t in atom_types:
+            if t == 'HD':
+                out[t] = atom_dict[atom_dict['atomicnum'] == 1 & atom_dict['isdonorh']]
+            elif t == 'C':
+                out[t] = atom_dict[atom_dict['atomicnum'] == 6 & ~atom_dict['isaromatic']]
+            elif t == 'A':
+                out[t] = atom_dict[atom_dict['atomicnum'] == 6 & atom_dict['isaromatic']]
+            elif t == 'N':
+                out[t] = atom_dict[atom_dict['atomicnum'] == 7 & ~atom_dict['isacceptor']]
+            elif t == 'NA':
+                out[t] = atom_dict[atom_dict['atomicnum'] == 7 & atom_dict['isacceptor']]
+            elif t == 'NA':
+                out[t] = atom_dict[atom_dict['atomicnum'] == 7 & atom_dict['isacceptor']]
+            elif t == 'F':
+                out[t] = atom_dict[atom_dict['atomicnum'] == 9]
+            elif t == 'MG':
+                out[t] = atom_dict[atom_dict['atomicnum'] == 12]
+            elif t == 'P':
+                out[t] = atom_dict[atom_dict['atomicnum'] == 15]
+            elif t == 'SA':
+                out[t] = atom_dict[atom_dict['atomicnum'] == 16 & atom_dict['isacceptor']]
+            elif t == 'S':
+                out[t] = atom_dict[atom_dict['atomicnum'] == 16 & ~atom_dict['isacceptor']]
+            elif t == 'CL':
+                out[t] = atom_dict[atom_dict['atomicnum'] == 17]
+            elif t == 'CA':
+                out[t] = atom_dict[atom_dict['atomicnum'] == 20]
+            elif t == 'MN':
+                out[t] = atom_dict[atom_dict['atomicnum'] == 25]
+            elif t == 'FE':
+                out[t] = atom_dict[atom_dict['atomicnum'] == 26]
+            elif t == 'ZN':
+                out[t] = atom_dict[atom_dict['atomicnum'] == 30]
+            elif t == 'BR':
+                out[t] = atom_dict[atom_dict['atomicnum'] == 35]
+            elif t == 'I':
+                out[t] = atom_dict[atom_dict['atomicnum'] == 53]
+        return out
     
     def build(self, ligands, protein = None):
         if protein is None:
@@ -64,66 +109,3 @@ class fingerprints:
                 out = np.zeros_like(fp)
             out = np.vstack((fp, out))
         return out[1:]
-        
-        
-        
-        
-        
-        
-#    def atom_dict_types(self, types, mode='ad4'):
-#        """
-#        Get dictionary of atom indicies, based on given atom types
-#        types: an array of types as strings
-#        mode: which types to use (ad4, sybyl)
-#        """
-#        mol_atoms = {}
-#        for t in types:
-#            mol_atoms[t] = []
-#        if mode == 'ad4': # AutoDock4 types http://autodock.scripps.edu/faqs-help/faq/where-do-i-set-the-autodock-4-force-field-parameters
-#            for atom in self.mol:
-#                # A
-#                if atom.type == 'Car' and 'A' in types:
-#                    mol_atoms['A'].append(atom.coords)
-#                # C
-#                elif atom.atomicnum == 6 and 'C' in types:
-#                    mol_atoms['C'].append(atom.coords)
-#                # CL
-#                elif atom.atomicnum == 17 and 'CL' in types:
-#                    mol_atoms['CL'].append(atom.coords)
-#                # F
-#                elif atom.atomicnum == 9 and 'F' in types:
-#                    mol_atoms['F'].append(atom.coords)
-#                # FE
-#                elif atom.atomicnum == 26 and 'FE' in types:
-#                    mol_atoms['FE'].append(atom.coords)
-#                # HD
-#                elif atom.atomicnum == 1 and 'HD' in types and atom.OBAtom.IsHbondDonorH():
-#                    mol_atoms['HD'].append(atom.coords)
-#                # MG
-#                elif atom.atomicnum == 12 and 'MG' in types:
-#                    mol_atoms['MG'].append(atom.coords)
-#                # MN
-#                elif atom.atomicnum == 12 and 'MN' in types:
-#                    mol_atoms['MN'].append(atom.coords)
-#                # NA
-#                elif atom.atomicnum == 7 and 'NA' in types and atom.OBAtom.IsHbondAcceptor():
-#                    mol_atoms['NA'].append(atom.coords)
-#                # N
-#                elif atom.atomicnum == 7 and 'N' in types:
-#                    mol_atoms['N'].append(atom.coords)
-#                # OA
-#                elif atom.atomicnum == 8 and 'OA' in types and atom.OBAtom.IsHbondAcceptor():
-#                    mol_atoms['OA'].append(atom.coords)
-#                # O
-#                elif atom.atomicnum == 8 and 'O' in types:
-#                    mol_atoms['O'].append(atom.coords)
-#                # SA
-#                elif atom.atomicnum == 16 and 'SA' in types and atom.OBAtom.IsHbondAcceptor():
-#                    mol_atoms['SA'].append(atom.coords)
-#                # S
-#                elif atom.atomicnum == 16 and 'S' in types:
-#                    mol_atoms['S'].append(atom.coords)
-#                # ZN
-#                elif atom.atomicnum == 30 and 'ZN' in types:
-#                    mol_atoms['ZN'].append(atom.coords)
-
