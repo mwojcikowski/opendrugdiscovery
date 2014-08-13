@@ -1,54 +1,33 @@
 import numpy as np
 from scipy.spatial.distance import cdist as distance
 
-class close_contacts:
-    def __init__(self, protein = None, cutoff = 4, mode = 'atomic_nums', ligand_types = None, protein_types = None, aligned_pairs = False):
-        self.cutoff = cutoff
-        self.protein = protein
-        self.ligand_types = ligand_types
-        self.protein_types = protein_types if protein_types else ligand_types
-        self.aligned_pairs = aligned_pairs
-        
-        if mode == 'atomic_nums':
-            self.typer = self._atomic_nums
-        elif mode == 'atom_types_sybyl':
-            self.typer = self._atom_types_sybyl
-        elif mode == 'atom_types_ad4':
-            self.typer = self._atom_types_ad4
-    
-    def _atomic_nums(atom_dict, protein = False):
-        atomic_nums = self.protein_types if protein else self.ligand_types
-        return {num: atom_dict[atom_dict['atomicnum'] == num] for num in atomic_nums}
-    
-    def _atomic_nums(self, atom_dict, protein = False):
-        atomic_nums = self.protein_types if protein else self.ligand_types
-        return {num: atom_dict[atom_dict['atomicnum'] == num] for num in atomic_nums}
-    
-    def _atom_types_sybyl(self, atom_dict, protein = False):
-        atom_types = self.protein_types if protein else self.ligand_types
-        return {t: atom_dict[atom_dict['atomtype'] == t] for t in atom_types}
-    
-    def _atom_types_ad4(self, atom_dict, protein = False):
-        """
-        AutoDock4 types definition: http://autodock.scripps.edu/faqs-help/faq/where-do-i-set-the-autodock-4-force-field-parameters
-        """
-        atom_types = self.protein_types if protein else self.ligand_types
+def atoms_by_type(atom_dict, types, mode = 'atomic_nums'):
+    """
+    AutoDock4 types definition: http://autodock.scripps.edu/faqs-help/faq/where-do-i-set-the-autodock-4-force-field-parameters
+    """
+    if mode == 'atomic_nums':
+        return {num: atom_dict[atom_dict['atomicnum'] == num] for num in set(types)}
+    elif mode == 'atom_types_sybyl':
+        return {t: atom_dict[atom_dict['atomtype'] == t] for t in set(types)}
+    elif mode == 'atom_types_ad4':
         # all AD4 atom types are capitalized
-        atom_types = [i.upper() for i in atom_types]
+        types = [t.upper() for t in types]
         out = {}
-        for t in atom_types:
+        for t in set(types):
             if t == 'HD':
                 out[t] = atom_dict[atom_dict['atomicnum'] == 1 & atom_dict['isdonorh']]
             elif t == 'C':
                 out[t] = atom_dict[atom_dict['atomicnum'] == 6 & ~atom_dict['isaromatic']]
+            elif t == 'CD': # not canonical AD4 type, although used by NNscore, with no description. properies assued by name
+                out[t] = atom_dict[atom_dict['atomicnum'] == 6 & ~atom_dict['isdonor']]
             elif t == 'A':
                 out[t] = atom_dict[atom_dict['atomicnum'] == 6 & atom_dict['isaromatic']]
             elif t == 'N':
                 out[t] = atom_dict[atom_dict['atomicnum'] == 7 & ~atom_dict['isacceptor']]
             elif t == 'NA':
                 out[t] = atom_dict[atom_dict['atomicnum'] == 7 & atom_dict['isacceptor']]
-            elif t == 'NA':
-                out[t] = atom_dict[atom_dict['atomicnum'] == 7 & atom_dict['isacceptor']]
+            elif t == 'OA':
+                out[t] = atom_dict[atom_dict['atomicnum'] == 8 & atom_dict['isacceptor']]
             elif t == 'F':
                 out[t] = atom_dict[atom_dict['atomicnum'] == 9]
             elif t == 'MG':
@@ -67,22 +46,39 @@ class close_contacts:
                 out[t] = atom_dict[atom_dict['atomicnum'] == 25]
             elif t == 'FE':
                 out[t] = atom_dict[atom_dict['atomicnum'] == 26]
+            elif t == 'CU':
+                out[t] = atom_dict[atom_dict['atomicnum'] == 29]
             elif t == 'ZN':
                 out[t] = atom_dict[atom_dict['atomicnum'] == 30]
             elif t == 'BR':
                 out[t] = atom_dict[atom_dict['atomicnum'] == 35]
             elif t == 'I':
                 out[t] = atom_dict[atom_dict['atomicnum'] == 53]
+            else:
+                 raise ValueError('Unsopported atom type: %s' % t)
         return out
+
+class close_contacts:
+    def __init__(self, protein = None, cutoff = 4, mode = 'atomic_nums', ligand_types = None, protein_types = None, aligned_pairs = False):
+        self.cutoff = cutoff
+        self.protein = protein
+        self.ligand_types = ligand_types
+        self.protein_types = protein_types if protein_types else ligand_types
+        self.aligned_pairs = aligned_pairs
+        self.mode = mode
     
     def build(self, ligands, protein = None):
         if protein is None:
             protein = self.protein
-        prot_dict = self.typer(protein.atom_dict, protein = True)
-        out = np.zeros(len(self.ligand_types)*len(self.protein_types), dtype=int)
+        prot_dict = atoms_by_type(protein.atom_dict, self.protein_types, self.mode)
+        desc_size = len(self.ligand_types) if self.aligned_pairs else len(self.ligand_types)*len(self.protein_types)
+        out = np.zeros(desc_size, dtype=int)
         for mol in ligands:
-            mol_dict = self.typer(mol.atom_dict) 
-            desc = np.array([(distance(prot_dict[prot_type]['coords'], mol_dict[mol_type]['coords']) <= self.cutoff).sum() for prot_type in self.protein_types for mol_type in self.ligand_types], dtype=int)
+            mol_dict = atoms_by_type(mol.atom_dict, self.ligand_types, self.mode) 
+            if self.aligned_pairs:
+                desc = np.array([(distance(prot_dict[prot_type]['coords'], mol_dict[mol_type]['coords']) <= self.cutoff).sum() for mol_type, prot_type in zip(self.ligand_types, self.protein_types)], dtype=int)
+            else:
+                desc = np.array([(distance(prot_dict[prot_type]['coords'], mol_dict[mol_type]['coords']) <= self.cutoff).sum() for prot_type in self.protein_types for mol_type in self.ligand_types], dtype=int)
             out = np.vstack((out, desc))
         return out[1:]
         
