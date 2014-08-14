@@ -27,7 +27,7 @@ def hbond_acceptor_donor(mol1, mol2, cutoff = 3.5, base_angle = 120, tolerance =
 def hbond(mol1, mol2, cutoff = 3.5, tolerance = 30):
     a1, d1, s1 = hbond_acceptor_donor(mol1, mol2, cutoff = cutoff, tolerance = tolerance)
     a2, d2, s2 = hbond_acceptor_donor(mol2, mol1, cutoff = cutoff, tolerance = tolerance)
-    return np.concatenate((a1, a2)), np.concatenate((d1, d2)), np.concatenate((s1, s2))
+    return np.concatenate((a1, d2)), np.concatenate((d1, a2)), np.concatenate((s1, s2))
 
 def halogenbond_acceptor_halogen(mol1, mol2, base_angle_acceptor = 120, base_angle_halogen = 180, tolerance = 30, cutoff = 4):
     a, h = close_contacts(mol1.atom_dict[mol1.atom_dict['isacceptor']], mol2.atom_dict[mol2.atom_dict['ishalogen']], cutoff)
@@ -45,7 +45,7 @@ def halogenbond_acceptor_halogen(mol1, mol2, base_angle_acceptor = 120, base_ang
 def halogenbond(mol1, mol2, base_angle_acceptor = 120, base_angle_halogen = 180, tolerance = 30, cutoff = 4):
     a1, h1, s1 = halogenbond_acceptor_halogen(mol1, mol2, base_angle_acceptor = base_angle_acceptor, base_angle_halogen = base_angle_halogen, tolerance = tolerance, cutoff = cutoff)
     a2, h2, s2 = halogenbond_acceptor_halogen(mol2, mol1, base_angle_acceptor = base_angle_acceptor, base_angle_halogen = base_angle_halogen, tolerance = tolerance, cutoff = cutoff)
-    return np.concatenate((a1, a2)), np.concatenate((h1, h2)), np.concatenate((s1, s2))
+    return np.concatenate((a1, h2)), np.concatenate((h1, a2)), np.concatenate((s1, s2))
 
 def pi_stacking(mol1, mol2, cutoff = 5, tolerance = 30):
     r1, r2 = close_contacts(mol1.ring_dict, mol2.ring_dict, cutoff, x_column = 'centroid', y_column = 'centroid')
