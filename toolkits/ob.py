@@ -126,11 +126,11 @@ class Molecule(pybel.Molecule):
             neighbors = np.empty(4, dtype=[('coords', 'float16', 3),('atomicnum', 'int8')])
             neighbors.fill(np.nan)
             n = 0
-            for nbr_atom in [x for x in OBAtomAtomIter(atom.OBAtom)]:
-                nbr_atomicnum = nbr_atom.GetAtomicNum()
+            for nbr_atom in atom.neighbors:
+                nbr_atomicnum = nbr_atom.atomicnum
 #                if nbr_atomicnum == 1:
 #                    continue
-                neighbors[n] = ((nbr_atom.GetX(), nbr_atom.GetY(), nbr_atom.GetZ()), nbr_atomicnum)
+                neighbors[n] = (nbr_atom.coords, nbr_atomicnum)
                 n += 1
             atom_dict[i] = (atom.idx,
                       coords,
@@ -205,12 +205,13 @@ class Molecule(pybel.Molecule):
         for ring in self.sssr:
             if ring.IsAromatic():
                 path = ring._path
+                atom = atom_dict[atom_dict['id'] == path[0]]
                 coords = atom_dict[np.in1d(atom_dict['id'], path)]['coords']
                 centroid = coords.mean(axis=0)
                 # get vector perpendicular to ring
                 vector = np.cross(coords - np.vstack((coords[1:],coords[:1])), np.vstack((coords[1:],coords[:1])) - np.vstack((coords[2:],coords[:2]))).mean(axis=0) - centroid
-                r.append((centroid, vector))
-        ring_dict = np.array(r, dtype=[('centroid', 'float16', 3),('vector', 'float16', 3)])
+                r.append((centroid, vector, atom['isalpha'], atom['isbeta']))
+        ring_dict = np.array(r, dtype=[('centroid', 'float16', 3),('vector', 'float16', 3),('isalpha', 'bool'),('isbeta', 'bool'),])
         
         self._atom_dict = atom_dict
         self._ring_dict = ring_dict
@@ -219,6 +220,13 @@ class Molecule(pybel.Molecule):
 
 ### Extend pybel.Molecule
 pybel.Molecule = Molecule
+
+class Atom(pybel.Atom):
+    @property
+    def neighbors(self):
+        return [Atom(a) for a in OBAtomAtomIter(self.OBAtom)]
+
+pybel.Atom = Atom
 
 class Fingerprint(pybel.Fingerprint):
     @property
