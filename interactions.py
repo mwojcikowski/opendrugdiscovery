@@ -49,13 +49,14 @@ def halogenbond(mol1, mol2, base_angle_acceptor = 120, base_angle_halogen = 180,
 
 def pi_stacking(mol1, mol2, cutoff = 5, tolerance = 30):
     r1, r2 = close_contacts(mol1.ring_dict, mol2.ring_dict, cutoff, x_column = 'centroid', y_column = 'centroid')
-    if len(r1) == 0 or len(r2) == 0:
+    if len(r1) > 0 and len(r2) > 0:
         angle1 = angle_2v(r1['vector'],r2['vector'])
         angle2 = angle(r1['vector'] + r1['centroid'],r1['centroid'], r2['centroid'])
-        strict = ((angle1 > 180 - tolerance) | (angle1 < tolerance) | (angle2 > 90 - tolerance)) & ((angle2 > 180 - tolerance) | (angle1 < tolerance))
-        return r1, r2, strict
+        strict_paralel = ((angle1 > 180 - tolerance) | (angle1 < tolerance)) & ((angle2 > 180 - tolerance) | (angle2 < tolerance))
+        strict_perpendicular = ((angle1 > 90 - tolerance) & (angle1 < 90 + tolerance)) & ((angle2 > 180 - tolerance) | (angle2 < tolerance))
+        return r1, r2, strict_paralel, strict_perpendicular
     else:
-        return r1, r2, np.array([], dtype=bool)
+        return r1, r2, np.array([], dtype=bool), np.array([], dtype=bool)
 
 def salt_bridge_plus_minus(mol1, mol2, cutoff = 4):
     m1_plus, m2_minus = close_contacts(mol1.atom_dict[mol1.atom_dict['isplus']], mol2.atom_dict[mol2.atom_dict['isminus']], cutoff)
