@@ -39,7 +39,9 @@ class autodock_vina:
         self.params = self.params + ['--num_modes', str(num_modes)]
         self.params = self.params + ['--energy_range', str(energy_range)]
     
-    def score(self, ligands):
+    def score(self, ligands, single = False):
+        if single:
+            ligands = [ligands]
         tmp_dir = mkdtemp(dir = self.dir, prefix='autodock_vina_')
         # write protein to file
         protein_file = tmp_dir + '/protein.pdbqt'
@@ -57,7 +59,9 @@ class autodock_vina:
         rmtree(tmp_dir)
         return output_array
             
-    def dock(self, ligands):
+    def dock(self, ligands, single = False):
+        if single:
+            ligands = [ligands]
         tmp_dir = mkdtemp(dir = self.dir, prefix='autodock_vina_')
         # write protein to file
         protein_file = tmp_dir + '/protein.pdbqt'
