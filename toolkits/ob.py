@@ -104,8 +104,9 @@ class Molecule(pybel.Molecule):
 
         a = []
         atom_dict = np.empty(self.OBMol.NumAtoms(), dtype=atom_dtype)
-        i = 0
-        for atom in self.atoms:
+        metals = [3,4,11,12,13,19,20,21,22,23,24,25,26,27,28,29,30,31,37,38,39,40,41,42,43,44,45,46,47,48,49,50,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,87,88,89,90,91,
+    92,93,94,95,96,97,98,99,100,101,102,103]
+        for i, atom in enumerate(self.atoms):
             
             atomicnum = atom.atomicnum
             # skip non-polar hydrogens for performance
@@ -121,17 +122,11 @@ class Molecule(pybel.Molecule):
                 residue = False
             
             # get neighbors, but only for those atoms which realy need them
-            #neighbors = []
-            #n_coords = np.empty((6,3), dtype='float16')
             neighbors = np.empty(4, dtype=[('coords', 'float16', 3),('atomicnum', 'int8')])
             neighbors.fill(np.nan)
-            n = 0
-            for nbr_atom in atom.neighbors:
+            for n, nbr_atom in enumerate(atom.neighbors):
                 nbr_atomicnum = nbr_atom.atomicnum
-#                if nbr_atomicnum == 1:
-#                    continue
                 neighbors[n] = (nbr_atom.coords, nbr_atomicnum)
-                n += 1
             atom_dict[i] = (atom.idx,
                       coords,
                       partialcharge,
@@ -147,7 +142,7 @@ class Molecule(pybel.Molecule):
                       atom.OBAtom.IsHbondAcceptor(),
                       atom.OBAtom.IsHbondDonor(),
                       atom.OBAtom.IsHbondDonorH(),
-                      atom.OBAtom.IsMetal(),
+                      atomicnum in metals,
                       atomicnum == 6 and not (np.in1d(neighbors['atomicnum'], [6,1])).any(), #hydrophobe #doble negation, since nan gives False
                       atom.OBAtom.IsAromatic(),
                       atomtype in ['O3-', '02-' 'O-'], # is charged (minus)
@@ -156,7 +151,6 @@ class Molecule(pybel.Molecule):
                       False, # alpha
                       False # beta
                       )
-            i +=1
         
         if self.protein:
             # Protein Residues (alpha helix and beta sheet)

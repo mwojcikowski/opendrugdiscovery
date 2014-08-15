@@ -78,7 +78,7 @@ _forcefields = {'uff': AllChem.UFFOptimizeMolecule}
 forcefields = _forcefields.keys()
 """A list of supported forcefields"""
 
-def readfile(format, filename):
+def readfile(format, filename, *args, **kwargs):
     """Iterate over the molecules in a file.
 
     Required parameters:
@@ -109,29 +109,33 @@ def readfile(format, filename):
     # errors in the format and errors in opening the file.
     # Then switch to an iterator...
     if format=="sdf":
-        iterator = Chem.SDMolSupplier(filename)
+        iterator = Chem.SDMolSupplier(filename, *args, **kwargs)
         def sdf_reader():
             for mol in iterator:
                 yield Molecule(mol)
         return sdf_reader()
     elif format=="mol":
         def mol_reader():
-            yield Molecule(Chem.MolFromMolFile(filename))
+            yield Molecule(Chem.MolFromMolFile(filename, *args, **kwargs))
+        return mol_reader()
+    elif format=="pdb":
+        def mol_reader():
+            yield Molecule(Chem.MolFromPDBFile(filename, *args, **kwargs))
         return mol_reader()
     elif format=="mol2":
         def mol_reader():
             block = ''
             for line in open(filename, 'r'):
                 if line.strip() == "@<TRIPOS>MOLECULE" and len(block) > 0:
-                    yield Molecule(Chem.MolFromMol2Block(block))
+                    yield Molecule(Chem.MolFromMol2Block(block, *args, **kwargs))
                 block += line
             # process last molecule
             if len(block) > 0:
-                yield Molecule(Chem.MolFromMol2Block(block))
+                yield Molecule(Chem.MolFromMol2Block(block, *args, **kwargs))
         return mol_reader()
     elif format=="smi":
         iterator = Chem.SmilesMolSupplier(filename, delimiter=" \t",
-                                          titleLine=False)
+                                          titleLine=False, *args, **kwargs)
         def smi_reader():
             for mol in iterator:
                 yield Molecule(mol)
@@ -139,7 +143,7 @@ def readfile(format, filename):
     elif format=='inchi' and Chem.INCHI_AVAILABLE:
         def inchi_reader():
             for line in open(filename, 'r'):
-                mol = Chem.inchi.MolFromInchi(line.strip())
+                mol = Chem.inchi.MolFromInchi(line.strip(), *args, **kwargs)
                 yield Molecule(mol)
         return inchi_reader()
     else:
@@ -164,6 +168,8 @@ def readstring(format, string):
         mol = Chem.MolFromMolBlock(string)
     elif format=="mol2":
         mol = Chem.MolFromMol2Block(string)
+    elif format=="pdb":
+        mol = Chem.MolFromPDBBlock(string)
     elif format=="smi":
         mol = Chem.MolFromSmiles(string)
     elif format=='inchi' and Chem.INCHI_AVAILABLE:
@@ -359,17 +365,19 @@ class Molecule(object):
 
         a = []
         atom_dict = np.empty(self.Mol.GetNumAtoms(), dtype=atom_dtype)
-        i = 0
-        for atom in self.atoms:
+        metals = [3,4,11,12,13,19,20,21,22,23,24,25,26,27,28,29,30,31,37,38,39,40,41,42,43,44,45,46,47,48,49,50,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,87,88,89,90,91,
+    92,93,94,95,96,97,98,99,100,101,102,103]
+        for i, atom in enumerate(self.atoms):
             
             atomicnum = atom.atomicnum
             partialcharge = atom.partialcharge
             coords = atom.coords
             atomtype = atom.Atom.GetProp("_TriposAtomType") if atom.Atom.HasProp("_TriposAtomType") else atom.Atom.GetSymbol()
-            if self.protein:
-                residue = pybel.Residue(atom.OBAtom.GetResidue())
-            else:
-                residue = False
+#            if self.protein:
+#                residue = pybel.Residue(atom.OBAtom.GetResidue())
+#            else:
+#                residue = False
+            residue = None
             
             # get neighbors, but only for those atoms which realy need them
             neighbors = np.empty(4, dtype=[('coords', 'float16', 3),('atomicnum', 'int8')])
@@ -381,8 +389,8 @@ class Molecule(object):
                       partialcharge,
                       atomicnum,
                       atomtype,
-                      atom.Atom.GetHybridization(), ######################################## tu wstepnie zrobione
-                      neighbors['coords'], #n_coords,
+                      atom.Atom.GetHybridization(),
+                      neighbors['coords'],
                       # residue info
                       residue.idx if residue else 0,
                       residue.name if residue else '',
@@ -391,7 +399,7 @@ class Molecule(object):
                       False, #atom.OBAtom.IsHbondAcceptor(),
                       False, #atom.OBAtom.IsHbondDonor(),
                       False, #atom.OBAtom.IsHbondDonorH(),
-                      False, #atom.OBAtom.IsMetal(),
+                      atomicnum in metals,
                       atomicnum == 6 and not (np.in1d(neighbors['atomicnum'], [6,1])).any(), #hydrophobe #doble negation, since nan gives False
                       atom.Atom.GetIsAromatic(),
                       atomtype in ['O3-', '02-' 'O-'], # is charged (minus)
@@ -400,7 +408,6 @@ class Molecule(object):
                       False, # alpha
                       False # beta
                       )
-            i +=1
         
 #        if self.protein:
 #            # Protein Residues (alpha helix and beta sheet)
@@ -495,6 +502,8 @@ class Molecule(object):
             result = Chem.MolToSmiles(self.Mol, isomericSmiles=True, canonical=True)
         elif format=="mol":
             result = Chem.MolToMolBlock(self.Mol)
+        elif format=="pdb":
+            result = Chem.MolToPDBBlock(self.Mol)
         elif format in ('inchi', 'inchikey') and Chem.INCHI_AVAILABLE:
             result = Chem.inchi.MolToInchi(self.Mol)
             if format == 'inchikey':
