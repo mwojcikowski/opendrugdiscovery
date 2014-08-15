@@ -38,13 +38,13 @@ class Molecule(pybel.Molecule):
     @property
     def coords(self):
         if self._coords is None:
-            self._coords = np.array([atom.coords for atom in self.mol])
+            self._coords = np.array([atom.coords for atom in self.atoms])
         return self._coords
     
     @property
     def charges(self):
         if self._charges is None:
-            self._charges = np.array([atom.partialcharge for atom in self.mol])
+            self._charges = np.array([atom.partialcharge for atom in self.atoms])
         return self._charges
     
     #### Custom ODDT properties ####
@@ -148,7 +148,7 @@ class Molecule(pybel.Molecule):
                       atom.OBAtom.IsHbondDonor(),
                       atom.OBAtom.IsHbondDonorH(),
                       atom.OBAtom.IsMetal(),
-                      atomicnum == 6 and len(neighbors) > 0 and not (neighbors['atomicnum'] != 6).any(), #hydrophobe
+                      atomicnum == 6 and not (np.in1d(neighbors['atomicnum'], [6,1])).any(), #hydrophobe #doble negation, since nan gives False
                       atom.OBAtom.IsAromatic(),
                       atomtype in ['O3-', '02-' 'O-'], # is charged (minus)
                       atomtype in ['N3+', 'N2+', 'Ng+'], # is charged (plus)
