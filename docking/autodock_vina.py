@@ -1,9 +1,11 @@
 from tempfile import mkdtemp
 from shutil import rmtree
 from os.path import exists
+from os import remove
 import subprocess
 import numpy as np
 import re
+from random import random
 import pybel
 
 class autodock_vina:
@@ -26,7 +28,10 @@ class autodock_vina:
         
         # share protein to class
         self.protein = protein
-        
+        self.tmp_dir = mkdtemp(dir = self.dir, prefix='autodock_vina_')
+        # write protein to file
+        self.protein_file = self.tmp_dir  + '/protein.pdbqt'
+        self.protein.write('pdbqt', self.protein_file, opt={'r':None,})
         
         #pregenerate common Vina parameters
         self.params = []
@@ -42,31 +47,32 @@ class autodock_vina:
     def score(self, ligands, single = False):
         if single:
             ligands = [ligands]
-        tmp_dir = mkdtemp(dir = self.dir, prefix='autodock_vina_')
-        # write protein to file
-        protein_file = tmp_dir + '/protein.pdbqt'
-        self.protein.write('pdbqt', protein_file, opt={'r':None,})
-        
+        if single:
+            ligand_dir = self.tmp_dir
+        else:
+            ligand_dir = mkdtemp(dir = self.tmp_dir, prefix='ligands_')
         output_array = []
-        ligand_dir = mkdtemp(dir = tmp_dir, prefix='ligands_')
         for n, ligand in enumerate(ligands):
             # write ligand to file
             ligand_file = ligand_dir + '/' + str(n) + '.pdbqt'
             ligand.write('pdbqt', ligand_file, overwrite=True)
-            scores = parse_vina_scoring_output(subprocess.check_output([self.executable, '--score_only', '--receptor', protein_file, '--ligand', ligand_file] + self.params))
+            scores = parse_vina_scoring_output(subprocess.check_output([self.executable, '--score_only', '--receptor', self.protein_file, '--ligand', ligand_file] + self.params))
             ligand.data.update(scores)
             output_array.append(ligand)
-        rmtree(tmp_dir)
+        if single:
+            remove(ligand_file)
+        else:
+            rmtree(ligand_dir)
         return output_array
             
     def dock(self, ligands, single = False):
         if single:
             ligands = [ligands]
-        tmp_dir = mkdtemp(dir = self.dir, prefix='autodock_vina_')
-        # write protein to file
-        protein_file = tmp_dir + '/protein.pdbqt'
-        self.protein.write('pdbqt', protein_file, opt={'r':None,})
-        
+        output_array = []
+        if single:
+            ligand_dir = self.tmp_dir
+        else:
+            ligand_dir = mkdtemp(dir = self.tmp_dir, prefix='ligands_')
         output_array = []
         ligand_dir = mkdtemp(dir = tmp_dir, prefix='ligands_')
         for n, ligand in enumerate(ligands):
@@ -78,8 +84,14 @@ class autodock_vina:
             for lig, scores in zip([lig for lig in pybel.readfile('pdbqt', ligand_outfile)], vina):
                 lig.data.update(scores)
                 output_array.append(lig)
-        rmtree(tmp_dir)
+        if single:
+            remove(ligand_file)
+        else:
+            rmtree(ligand_dir)
         return output_array
+    
+    def clean(self):
+        rmtree(self.tmp_dir)
     
 def parse_vina_scoring_output(output):
     out = {}
