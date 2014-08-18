@@ -29,11 +29,9 @@ class scorer(object):
             cv_target = self.train_target
         return cross_val_score(self.model, cv_set, cv_target, cv = n)
         
-    def save(filename):
-        f = open(filename,'wb')
-        pickle.dump(self, filename)
-        f.close()
+    def save(self, filename):
+        return pickle.dump(self, filename, compress=1)
     
     @classmethod
-    def load(filename):
-        return pickle.load(open(filename,'rb'))
+    def load(self, filename):
+        return pickle.load(filename)
