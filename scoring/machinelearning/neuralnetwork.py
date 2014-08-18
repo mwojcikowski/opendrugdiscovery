@@ -1,6 +1,7 @@
 ## FIX use ffnet for now, use sklearn in future
 from ffnet import ffnet,mlgraph,tmlgraph
 import numpy as np
+from scipy.stats import linregress
 
 class neuralnetwork:
     def __init__(self, shape, loadnet=None, full_conn=True, biases=False):
@@ -21,4 +22,8 @@ class neuralnetwork:
         getattr(self.model, 'train_'+train_alg)(input_descriptors, target_values, maxfun=10000)
     
     def predict(self, input_descriptors):
-         return np.array(self.model.call(input_descriptors)).flatten()
+        return np.array(self.model.call(input_descriptors))
+    
+    def score(X, y):
+        return linregress(self.predict(X), y)[2]**2
+        
