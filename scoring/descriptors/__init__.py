@@ -6,7 +6,7 @@ def atoms_by_type(atom_dict, types, mode = 'atomic_nums'):
     AutoDock4 types definition: http://autodock.scripps.edu/faqs-help/faq/where-do-i-set-the-autodock-4-force-field-parameters
     """
     if mode == 'atomic_nums':
-        return {num: atom_dict[atom_dict['atomicnum'] == num] for num in set(types)}
+        return {str(num): atom_dict[atom_dict['atomicnum'] == num] for num in set(types)}
     elif mode == 'atom_types_sybyl':
         return {t: atom_dict[atom_dict['atomtype'] == t] for t in set(types)}
     elif mode == 'atom_types_ad4':
@@ -78,9 +78,9 @@ class close_contacts(object):
         for mol in ligands:
             mol_dict = atoms_by_type(mol.atom_dict, self.ligand_types, self.mode) 
             if self.aligned_pairs:
-                desc = np.array([(distance(prot_dict[prot_type]['coords'], mol_dict[mol_type]['coords']) <= self.cutoff).sum() for mol_type, prot_type in zip(self.ligand_types, self.protein_types)], dtype=int)
+                desc = np.array([(distance(prot_dict[str(prot_type)]['coords'], mol_dict[str(mol_type)]['coords']) <= self.cutoff).sum() for mol_type, prot_type in zip(self.ligand_types, self.protein_types)], dtype=int)
             else:
-                desc = np.array([(distance(prot_dict[prot_type]['coords'], mol_dict[mol_type]['coords']) <= self.cutoff).sum() for prot_type in self.protein_types for mol_type in self.ligand_types], dtype=int)
+                desc = np.array([(distance(prot_dict[str(prot_type)]['coords'], mol_dict[str(mol_type)]['coords']) <= self.cutoff).sum() for mol_type in self.ligand_types for prot_type in self.protein_types], dtype=int)
             out = np.vstack((out, desc))
         return out[1:]
         
