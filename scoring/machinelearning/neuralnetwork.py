@@ -19,11 +19,11 @@ class neuralnetwork:
             self.model = ffnet(conec)
     
     def fit(self, input_descriptors, target_values, train_alg='tnc'):
-        getattr(self.model, 'train_'+train_alg)(input_descriptors, target_values, maxfun=10000)
+        getattr(self.model, 'train_'+train_alg)(input_descriptors, target_values, maxfun=1000)
     
     def predict(self, input_descriptors):
         return np.array(self.model.call(input_descriptors))
     
-    def score(X, y):
-        return linregress(self.predict(X), y)[2]**2
+    def score(self, X, y):
+        return linregress(self.predict(X).flatten(), y)[2]**2
         
