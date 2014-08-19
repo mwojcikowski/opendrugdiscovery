@@ -25,7 +25,7 @@ def generate_descriptor(packed):
     ligand = toolkit.readfile("sdf", ligand_file).next()
     return gen.build([ligand], protein).flatten()
 
- # skip comments and merge multiple spaces
+# skip comments and merge multiple spaces
 def _csv_file_filter(f):
     for row in open(f, 'rb'):
         if row[0] == '#':
@@ -41,15 +41,11 @@ class rfscore(scorer):
         super(rfscore,self).__init__(model, descriptors)
     
     def train(self, pdbbind_dir, pdbbind_version = '2007', sf_pickle = ''):
-        core_desc = np.zeros((1,36), dtype=int)
-        core_act = np.zeros(1, dtype=float)
-        refined_desc = np.zeros((1,36), dtype=int)
-        refined_act = np.zeros(1, dtype=float)
-        
         # build train and test 
         cpus = self.n_jobs if self.n_jobs > 0 else None
         pool = Pool(processes=cpus)
         
+        core_act = np.zeros(1, dtype=float)
         core_set = []
         if pdbbind_version == '2007':
             csv_file = pdbbind_dir + "/v" + pdbbind_version + "/INDEX." + pdbbind_version + ".core.data"
@@ -67,6 +63,7 @@ class rfscore(scorer):
         core_desc = np.vstack(result)
         core_act = core_act[1:]
         
+        refined_act = np.zeros(1, dtype=float)
         refined_set = []
         if pdbbind_version == '2007':
             csv_file = pdbbind_dir + "/v" + pdbbind_version + "/INDEX." + pdbbind_version + ".refined.data"

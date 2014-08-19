@@ -125,6 +125,9 @@ class Molecule(pybel.Molecule):
             neighbors = np.empty(4, dtype=[('coords', 'float16', 3),('atomicnum', 'int8')])
             neighbors.fill(np.nan)
             for n, nbr_atom in enumerate(atom.neighbors):
+                # concider raising neighbors list to 6, but must do some benchmarks
+                if n > 3:
+                    break
                 nbr_atomicnum = nbr_atom.atomicnum
                 neighbors[n] = (nbr_atom.coords, nbr_atomicnum)
             atom_dict[i] = (atom.idx,
