@@ -40,7 +40,7 @@ class rfscore(scorer):
         descriptors = close_contacts(protein, cutoff = cutoff, protein_types = protein_atomic_nums, ligand_types = ligand_atomic_nums)
         super(rfscore,self).__init__(model, descriptors)
     
-    def train(self, pdbbind_dir, pdbbind_version = '2013', sf_pickle = ''):
+    def train(self, pdbbind_dir, pdbbind_version = '2007', sf_pickle = ''):
         core_desc = np.zeros((1,36), dtype=int)
         core_act = np.zeros(1, dtype=float)
         refined_desc = np.zeros((1,36), dtype=int)
@@ -105,7 +105,7 @@ class rfscore(scorer):
             self.save(sf_pickle)
         else:
             self.save(dirname(__file__) + '/RFscore.pickle')
-    
+        
     @classmethod
     def load(self, filename = ''):
         if not filename:
