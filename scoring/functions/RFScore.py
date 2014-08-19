@@ -10,7 +10,7 @@ from oddt.scoring.descriptors import close_contacts
 
 # RF-Score settings
 ligand_atomic_nums = [6,7,8,9,15,16,17,35,53]
-protein_atomic_nums = [6,7,8,9,15,16,17,35,53]
+protein_atomic_nums = [6,7,8,16]
 cutoff = 12
 
 # PDB IDs from original implementation
@@ -84,11 +84,11 @@ class rfscore(scorer):
         refined_desc = np.vstack(result)
         refined_act = refined_act[1:]
         
-        self.train_descs = core_desc
-        self.target = core_act
+        self.train_descs = refined_desc
+        self.train_target = refined_act
         
-        np.savetxt('PDBbind_refined07-core07_new.csv', np.hstack((refined_act, refined_desc, [[i] for i in refined_set])), delimiter=',', fmt='%s')
-        np.savetxt('PDBbind_core07_new.csv', np.hstack((core_act, core_desc, [[i] for i in core_set])), delimiter=',', fmt='%s')
+        self.test_descs = core_desc
+        self.test_target = core_act
         
         self.model.fit(refined_desc, refined_act.flatten())
         
@@ -104,4 +104,10 @@ class rfscore(scorer):
         if sf_pickle:
             self.save(sf_pickle)
         else:
-            print dirname(__file__) + '/RFscore.pickle'
+            self.save(dirname(__file__) + '/RFscore.pickle')
+    
+    @classmethod
+    def load(self, filename = ''):
+        if not filename:
+            filename = dirname(__file__) + '/RFscore.pickle'
+        return scorer.load(filename)
