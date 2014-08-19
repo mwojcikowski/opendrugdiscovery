@@ -4,7 +4,7 @@ from oddt.scoring.descriptors import atoms_by_type, close_contacts
 from oddt import interactions
 
 class binana_descriptor:
-    def __init__(self, protein):
+    def __init__(self, protein = None):
         self.protein = protein
         self.vina = autodock_vina(protein)
         # Close contacts descriptor generators
@@ -16,8 +16,11 @@ class binana_descriptor:
         self.cc_25 = close_contacts(protein, cutoff=2.5, protein_types=cc_25_rec_types, ligand_types=cc_25_lig_types, mode='atom_types_ad4', aligned_pairs=True)
         
     def build(self, ligands, protein = None):
-        if protein is None:
-            protein = self.protein
+        if protein:
+            self.protein = protein
+            self.vina.set_protein(protein)
+            self.cc_4.protein = protein
+            self.cc_25.protein = protein
         protein_dict = protein.atom_dict
         desc = None
         for mol in ligands:
@@ -26,7 +29,7 @@ class binana_descriptor:
             vec = tuple()
             # Vina
             ### TODO: Asynchronous output from vina, push command to score and retrieve at the end?
-            scored_mol = self.vina.score(mol, single=True)[0].data
+            scored_mol = self.vina.score(mol, protein, single=True)[0].data
             vina_scores = ['vina_affinity', 'vina_gauss1', 'vina_gauss2', 'vina_repulsion', 'vina_hydrophobic', 'vina_hydrogen']
             vec += tuple([scored_mol[key] for key in vina_scores])
             
