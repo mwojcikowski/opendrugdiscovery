@@ -2,11 +2,15 @@ import csv
 from os.path import dirname
 import numpy as np
 from multiprocessing import Pool
+import warnings
 
 from oddt.toolkits import ob as toolkit
 from oddt.scoring import scorer
 from oddt.scoring.descriptors.binana import binana_descriptor
 from oddt.scoring.machinelearning.neuralnetwork import neuralnetwork
+
+# numpy after pickling gives Runtime Warnings
+warnings.simplefilter("ignore", RuntimeWarning)
 
 # define sub-function for paralelization
 def generate_descriptor(packed):
