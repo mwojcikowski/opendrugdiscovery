@@ -1,5 +1,4 @@
-from multiprocessing import Pool
-
+import csv
 import toolkits.ob as toolkit
 
 
@@ -46,15 +45,43 @@ class virtualscreening:
                 if eval(expression):
                     yield mol
     
-#    def score(self):
-#    
-    def write(self, *args, **kwargs):
-        output_file = toolkit.Outputfile(*args, **kwargs)
-        for mol in self.fetch():
-            output_file.write(mol)
-        output_file.close()
+    def dock(self, docking_engine, protein, *args, **kwargs):
+        if type(protein) is str:
+            extension = protein.split('.')[-1]
+            protein = toolkit.readfile(extension, protein).next()
+            protein.protein = True
+        
+        if docking_engine.lower() == 'autodock_vina':
+            from .docking.autodock_vina import autodock_vina
+            engine = autodock_vina(protein, ncpu=self.cpus, *args, **kwargs)
+        else:
+            raise ValueError('Docking engine %s was not implemented in ODDT' % docking_engine)
+        def _iter_conf(results):
+            """ Generator to go through docking results, and put them to pipe """
+            for confs in results:
+                for conf in confs:
+                    yield conf
+        docking_results = (engine.dock(lig, single=True) for lig in self._pipe)
+        self._pipe = _iter_conf(docking_results)
+        
+    def score(self, scoring_function, protein, *args, **kwargs):
+        if type(protein) is str:
+            extension = protein.split('.')[-1]
+            protein = toolkit.readfile(extension, protein).next()
+            protein.protein = True
+        
+        if scoring_function.lower() == 'rfscore':
+            from .scoring.functions.RFScore import rfscore
+            sf = rfscore.load()
+            sf.set_protein(protein)
+        elif scoring_function.lower() == 'nnscore':
+            from .scoring.functions.NNScore import nnscore
+            sf = nnscore.load()
+            sf.set_protein(protein)
+        else:
+            raise ValueError('Docking engine %s was not implemented in ODDT' % t)
+        self._pipe = sf.predict_ligands(self._pipe)
     
-#    def write_csv():
     def fetch(self):
         for n, mol in enumerate(self._pipe):
             self.num_output = n+1 
@@ -63,3 +90,58 @@ class virtualscreening:
             yield mol
         if self.verbose:
             print ""
+    
+    # Consume the pipe
+    def write(self, fmt, filename, csv_filename = None, **kwargs):
+        output_mol_file = toolkit.Outputfile(fmt, filename, **kwargs)
+        if csv_filename:
+            f = open(csv_filename, 'w')
+            csv_file = None
+        for mol in self.fetch():
+            if csv_filename:
+                data = dict(mol.data)
+                #filter some internal data
+                blacklist_keys = ['OpenBabel Symmetry Classes', 'MOL Chiral Flag', 'PartialCharges', 'TORSDO', 'REMARK']
+                for b in blacklist_keys:
+                    if data.has_key(b):
+                        del data[b]
+                if len(data) > 0:
+                    data['name'] = mol.title
+                else:
+                    print "There is no data to write in CSV file"
+                    return False
+                if csv_file is None:
+                    csv_file = csv.DictWriter(f, data.keys(), **kwargs)
+                    csv_file.writeheader()
+                csv_file.writerow(data)
+            # write ligand
+            output_mol_file.write(mol)
+        output_mol_file.close()
+        f.close()
+#        if kwargs.has_key('keep_pipe') and kwargs['keep_pipe']:
+#            #FIXME destroys data
+#            self._pipe = toolkit.readfile(*args, **kwargs)
+    
+    def write_csv(self, csv_filename, keep_pipe = False, **kwargs):
+        f = open(csv_filename, 'w')
+        csv_file = None
+        for mol in self.fetch():
+            data = dict(mol.data)
+            #filter some internal data
+            blacklist_keys = ['OpenBabel Symmetry Classes', 'MOL Chiral Flag', 'PartialCharges', 'TORSDO', 'REMARK']
+            for b in blacklist_keys:
+                if data.has_key(b):
+                    del data[b]
+            if len(data) > 0:
+                data['name'] = mol.title
+            else:
+                print "There is no data to write in CSV file"
+                return False
+            if csv_file is None:
+                csv_file = csv.DictWriter(f, data.keys(), **kwargs)
+                csv_file.writeheader()
+            csv_file.writerow(data)
+            if keep_pipe:
+                #write ligand using pickle
+                pass
+        f.close()

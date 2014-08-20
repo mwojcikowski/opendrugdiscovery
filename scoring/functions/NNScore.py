@@ -38,7 +38,7 @@ class nnscore(scorer):
         self.n_jobs = n_jobs
         model = []
         decsriptors = binana_descriptor(protein)
-        super(nnscore,self).__init__(model, decsriptors)
+        super(nnscore,self).__init__(model, decsriptors, score_title='nnscore')
     
     def train(self, pdbbind_dir, pdbbind_version = '2007', sf_pickle = ''):
         # build train and test 

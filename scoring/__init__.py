@@ -40,7 +40,7 @@ from sklearn.externals import joblib as pickle
 
 ### FIX ### If possible make ensemble scorer lazy, for now it consumes all ligands
 class scorer(object):
-    def __init__(self, model_instances, descriptor_generator_instances):
+    def __init__(self, model_instances, descriptor_generator_instances, score_title = 'score'):
         self.model = model_instances
         if type(descriptor_generator_instances) is list:
             self.single_model = False
@@ -54,6 +54,7 @@ class scorer(object):
             self.single_descriptor = False
         else:
             self.single_descriptor = True
+        self.score_title = score_title
         
     def fit(self, ligands, target):
         if self.single_descriptor:
@@ -89,6 +90,13 @@ class scorer(object):
             descs = [desc_gen.build(ligands) for desc_gen in self.descriptor_generator]
             return [model.score(descs[n],target) for n, model in enumerate(self.model)]
     
+    def predict_ligands(self, ligands):
+        # make lazy calculation
+        for lig in ligands:
+            score = self.predict([lig])
+            lig.data.update({self.score_title: score[0]})
+            yield lig
+    
     def set_protein(self, protein):
         self.protein = protein
         if self.single_descriptor:
@@ -96,7 +104,6 @@ class scorer(object):
         else:
             for desc in self.descriptor_generator:
                 desc.protein = protein
-                
     
     ### TODO ### Test
     def cross_validate(n = 10, test_set = None, test_target = None):

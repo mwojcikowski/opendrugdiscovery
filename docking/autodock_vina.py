@@ -6,7 +6,7 @@ import subprocess
 import numpy as np
 import re
 from random import random
-import pybel
+from oddt.toolkits import ob as toolkit
 
 class autodock_vina:
     def __init__(self, protein=None, size=(10,10,10), center=(0,0,0), auto_ligand=None, exhaustivness=8, num_modes=9, energy_range=3, seed=None, prefix_dir='/tmp', ncpu=1, executable=None, autocleanup=True):
@@ -16,6 +16,9 @@ class autodock_vina:
         self.center = center
         # center automaticaly on ligand
         if auto_ligand:
+            if type(auto_ligand) is str:
+                extension = auto_ligand.split('.')[-1]
+                auto_ligand = toolkit.readfile(extension, auto_ligand).next()
             self.center = tuple(np.array([atom.coords for atom in auto_ligand], dtype=np.float16).mean(axis=0))
         # autodetect Vina executable
         if not executable:
@@ -91,7 +94,7 @@ class autodock_vina:
             ligand_outfile = ligand_dir + '/' + str(n) + '_out.pdbqt'
             ligand.write('pdbqt', ligand_file, overwrite=True)
             vina = parse_vina_docking_output(subprocess.check_output([self.executable, '--receptor', self.protein_file, '--ligand', ligand_file, '--out', ligand_outfile] + self.params))
-            for lig, scores in zip([lig for lig in pybel.readfile('pdbqt', ligand_outfile)], vina):
+            for lig, scores in zip([lig for lig in toolkit.readfile('pdbqt', ligand_outfile)], vina):
                 lig.data.update(scores)
                 output_array.append(lig)
         if single:

@@ -4,7 +4,7 @@ import numpy as np
 from scipy.stats import linregress
 
 class neuralnetwork:
-    def __init__(self, shape, loadnet=None, full_conn=True, biases=False):
+    def __init__(self, shape, loadnet=None, full_conn=True, biases=True, random_weights = True):
         """
         shape: shape of a NN given as a tuple
         """
@@ -17,6 +17,8 @@ class neuralnetwork:
             else:
                 conec = mlgraph(shapebiases)
             self.model = ffnet(conec)
+            if random_weights:
+                self.model.randomweights()
     
     def fit(self, input_descriptors, target_values, train_alg='tnc', **kwargs):
         getattr(self.model, 'train_'+train_alg)(input_descriptors, target_values, **kwargs)
