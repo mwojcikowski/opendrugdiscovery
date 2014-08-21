@@ -29,6 +29,7 @@ class binana_descriptor:
             vec = tuple()
             # Vina
             ### TODO: Asynchronous output from vina, push command to score and retrieve at the end?
+            ### TODO: Check if ligand has vina scores
             scored_mol = self.vina.score(mol, single=True)[0].data
             vina_scores = ['vina_affinity', 'vina_gauss1', 'vina_gauss2', 'vina_repulsion', 'vina_hydrophobic', 'vina_hydrogen']
             vec += tuple([scored_mol[key] for key in vina_scores])
