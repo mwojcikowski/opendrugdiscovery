@@ -51,11 +51,11 @@ class virtualscreening:
             protein = toolkit.readfile(extension, protein).next()
             protein.protein = True
         
-        if docking_engine.lower() == 'autodock_vina':
+        if engine.lower() == 'autodock_vina':
             from .docking.autodock_vina import autodock_vina
             engine = autodock_vina(protein, ncpu=self.cpus, *args, **kwargs)
         else:
-            raise ValueError('Docking engine %s was not implemented in ODDT' % docking_engine)
+            raise ValueError('Docking engine %s was not implemented in ODDT' % engine)
         def _iter_conf(results):
             """ Generator to go through docking results, and put them to pipe """
             for confs in results:
@@ -70,11 +70,11 @@ class virtualscreening:
             protein = toolkit.readfile(extension, protein).next()
             protein.protein = True
         
-        if scoring_function.lower() == 'rfscore':
+        if function.lower() == 'rfscore':
             from .scoring.functions.RFScore import rfscore
             sf = rfscore.load()
             sf.set_protein(protein)
-        elif scoring_function.lower() == 'nnscore':
+        elif function.lower() == 'nnscore':
             from .scoring.functions.NNScore import nnscore
             sf = nnscore.load()
             sf.set_protein(protein)
