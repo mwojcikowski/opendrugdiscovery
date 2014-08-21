@@ -6,7 +6,7 @@ def atoms_by_type(atom_dict, types, mode = 'atomic_nums'):
     AutoDock4 types definition: http://autodock.scripps.edu/faqs-help/faq/where-do-i-set-the-autodock-4-force-field-parameters
     """
     if mode == 'atomic_nums':
-        return {str(num): atom_dict[atom_dict['atomicnum'] == num] for num in set(types)}
+        return {num: atom_dict[atom_dict['atomicnum'] == num] for num in set(types)}
     elif mode == 'atom_types_sybyl':
         return {t: atom_dict[atom_dict['atomtype'] == t] for t in set(types)}
     elif mode == 'atom_types_ad4':
