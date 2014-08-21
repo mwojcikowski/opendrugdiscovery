@@ -119,8 +119,8 @@ class virtualscreening:
         output_mol_file.close()
         f.close()
 #        if kwargs.has_key('keep_pipe') and kwargs['keep_pipe']:
-#            #FIXME destroys data
-#            self._pipe = toolkit.readfile(*args, **kwargs)
+        #FIXME destroys data
+        self._pipe = toolkit.readfile(fmt, filename, **kwargs)
     
     def write_csv(self, csv_filename, keep_pipe = False, **kwargs):
         f = open(csv_filename, 'w')
