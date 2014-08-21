@@ -48,6 +48,12 @@ class Molecule(pybel.Molecule):
         return self._charges
     
     #### Custom ODDT properties ####
+    def __getattr__(self, attr):
+        for desc in pybel._descdict.keys():
+            if attr.lower() == desc.lower():
+                return self.calcdesc([desc])[desc]
+        raise AttributeError('Molecule has no such property: %s' % attr)
+    
     @property
     def num_rotors(self):
         return self.OBMol.NumRotors()
