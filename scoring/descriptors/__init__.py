@@ -82,7 +82,7 @@ class close_contacts(object):
                 # this must be LAZY!
                 desc = np.array([(distance(atoms_by_type(protein.atom_dict, [prot_type], self.mode)[prot_type]['coords'], atoms_by_type(mol.atom_dict, [mol_type], self.mode)[mol_type]['coords']) <= self.cutoff).sum() for mol_type, prot_type in zip(self.ligand_types, self.protein_types)], dtype=int)
             else:
-                desc = np.array([(distance(prot_dict[str(prot_type)]['coords'], mol_dict[str(mol_type)]['coords']) <= self.cutoff).sum() for mol_type in self.ligand_types for prot_type in self.protein_types], dtype=int)
+                desc = np.array([(distance(atoms_by_type(protein.atom_dict, [prot_type], self.mode)[prot_type]['coords'], atoms_by_type(mol.atom_dict, [mol_type], self.mode)[mol_type]['coords']) <= self.cutoff).sum() for mol_type in self.ligand_types for prot_type in self.protein_types], dtype=int)
             out = np.vstack((out, desc))
         return out[1:]
         
