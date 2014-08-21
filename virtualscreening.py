@@ -21,7 +21,7 @@ class virtualscreening:
     
     def apply_filter(self, expression, filter_type='expression', soft_fail = 0):
         if filter_type == 'expression':
-            self._pipe = self._filter(expression, soft_fail = soft_fail)
+            self._pipe = self._filter(self._pipe, expression, soft_fail = soft_fail)
         elif filter_type == 'preset':
             # define presets
             # TODO: move presets to another config file
@@ -45,7 +45,7 @@ class virtualscreening:
                 if eval(expression):
                     yield mol
     
-    def dock(self, docking_engine, protein, *args, **kwargs):
+    def dock(self, engine, protein, *args, **kwargs):
         if type(protein) is str:
             extension = protein.split('.')[-1]
             protein = toolkit.readfile(extension, protein).next()
@@ -64,7 +64,7 @@ class virtualscreening:
         docking_results = (engine.dock(lig, single=True) for lig in self._pipe)
         self._pipe = _iter_conf(docking_results)
         
-    def score(self, scoring_function, protein, *args, **kwargs):
+    def score(self, function, protein, *args, **kwargs):
         if type(protein) is str:
             extension = protein.split('.')[-1]
             protein = toolkit.readfile(extension, protein).next()
