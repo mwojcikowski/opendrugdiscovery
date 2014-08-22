@@ -100,10 +100,10 @@ class rfscore(scorer):
         if sf_pickle:
             self.save(sf_pickle)
         else:
-            self.save(dirname(__file__) + '/RFscore.pickle')
+            self.save(dirname(__file__) + '/RFScore.pickle')
         
     @classmethod
     def load(self, filename = ''):
         if not filename:
-            filename = dirname(__file__) + '/RFscore.pickle'
+            filename = dirname(__file__) + '/RFScore.pickle'
         return scorer.load(filename)
