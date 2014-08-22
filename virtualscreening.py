@@ -116,7 +116,7 @@ class virtualscreening:
             f.close()
 #        if kwargs.has_key('keep_pipe') and kwargs['keep_pipe']:
         #FIXME destroys data
-        self._pipe = toolkit.readfile(fmt, filename, **kwargs)
+        self._pipe = toolkit.readfile(fmt, filename)
     
     def write_csv(self, csv_filename, keep_pipe = False, **kwargs):
         f = open(csv_filename, 'w')
