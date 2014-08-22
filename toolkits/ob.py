@@ -3,8 +3,7 @@ from pybel import *
 import copy_reg
 import numpy as np
 from openbabel import OBAtomAtomIter,OBTypeTable
-
-from .. import angle,angle_2v,dihedral
+from oddt.spatial import angle, angle_2v, dihedral
 
 backend = 'ob'
 # setup typetable to translate atom types

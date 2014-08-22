@@ -1,7 +1,5 @@
 import numpy as np
-from scipy.spatial.distance import cdist as distance
-
-from . import dihedral,angle,angle_2v
+from oddt.spatial import dihedral, angle, angle_2v, distance
 
 def close_contacts(x, y, cutoff, x_column = 'coords', y_column = 'coords'):
     """ Returns pairs of close contacts atoms within cutoff. """

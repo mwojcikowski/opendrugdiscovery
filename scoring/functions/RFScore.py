@@ -4,7 +4,7 @@ import numpy as np
 from multiprocessing import Pool
 import warnings
 
-from oddt.toolkits import ob as toolkit
+from oddt import toolkit
 from oddt.scoring import scorer
 from oddt.scoring.machinelearning.randomforest import randomforest
 from oddt.scoring.descriptors import close_contacts

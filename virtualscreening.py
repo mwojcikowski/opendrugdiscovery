@@ -1,7 +1,5 @@
 import csv
-import toolkits.ob as toolkit
-
-
+from oddt import toolkit
 
 class virtualscreening:
     def __init__(self, cpus=-1, verbose=False):

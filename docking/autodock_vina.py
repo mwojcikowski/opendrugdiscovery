@@ -6,7 +6,7 @@ import subprocess
 import numpy as np
 import re
 from random import random
-from oddt.toolkits import ob as toolkit
+from oddt import toolkit
 
 class autodock_vina:
     def __init__(self, protein=None, size=(10,10,10), center=(0,0,0), auto_ligand=None, exhaustivness=8, num_modes=9, energy_range=3, seed=None, prefix_dir='/tmp', ncpu=1, executable=None, autocleanup=True):
