@@ -46,11 +46,6 @@ class virtualscreening:
                     yield mol
     
     def dock(self, engine, protein, *args, **kwargs):
-        if type(protein) is str:
-            extension = protein.split('.')[-1]
-            protein = toolkit.readfile(extension, protein).next()
-            protein.protein = True
-        
         if engine.lower() == 'autodock_vina':
             from .docking.autodock_vina import autodock_vina
             engine = autodock_vina(protein, ncpu=self.cpus, *args, **kwargs)
@@ -117,7 +112,8 @@ class virtualscreening:
             # write ligand
             output_mol_file.write(mol)
         output_mol_file.close()
-        f.close()
+        if csv_filename:
+            f.close()
 #        if kwargs.has_key('keep_pipe') and kwargs['keep_pipe']:
         #FIXME destroys data
         self._pipe = toolkit.readfile(fmt, filename, **kwargs)
