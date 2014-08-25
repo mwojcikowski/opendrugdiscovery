@@ -49,7 +49,7 @@ def dihedral(p1,p2,p3,p4):
     Parameters
     ----------
     p1,p2,p3,p4 : numpy arrays, shape = [n_points, n_dimensions]
-        Triplets of points in n-dimensional space, aligned in rows.
+        Quadruplets of points in n-dimensional space, aligned in rows.
     
     Returns
     -------
