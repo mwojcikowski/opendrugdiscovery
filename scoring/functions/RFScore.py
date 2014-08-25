@@ -6,7 +6,7 @@ import warnings
 
 from oddt import toolkit
 from oddt.scoring import scorer
-from oddt.scoring.machinelearning.randomforest import randomforest
+from oddt.scoring.models.regressors import randomforest
 from oddt.scoring.descriptors import close_contacts
 
 # numpy after pickling gives Runtime Warnings

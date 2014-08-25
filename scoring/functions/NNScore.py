@@ -7,7 +7,7 @@ import warnings
 from oddt import toolkit
 from oddt.scoring import scorer
 from oddt.scoring.descriptors.binana import binana_descriptor
-from oddt.scoring.machinelearning.neuralnetwork import neuralnetwork
+from oddt.scoring.models.regressors import neuralnetwork
 
 # numpy after pickling gives Runtime Warnings
 warnings.simplefilter("ignore", RuntimeWarning)
