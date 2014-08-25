@@ -1,5 +1,5 @@
 import csv
-from os.path import dirname
+from os.path import dirname, isfile, isdir
 import numpy as np
 from multiprocessing import Pool
 import warnings
@@ -20,7 +20,9 @@ cutoff = 12
 # define sub-function for paralelization
 def generate_descriptor(packed):
     pdbid, gen, pdbbind_dir, pdbbind_version = packed
-    protein_file = pdbbind_dir + "/v" + pdbbind_version + "/%s/%s_pocket.pdb" % (pdbid, pdbid)
+    protein_file = "%s/v%s/%s/%s_pocket.pdb" % (pdbbind_dir, pdbbind_version, pdbid, pdbid)
+    if not isfile(protein_file):
+        protein_file = pdbbind_dir + "/v" + pdbbind_version + "/%s/%s_protein.pdb" % (pdbid, pdbid)
     ligand_file = pdbbind_dir + "/v" + pdbbind_version + "/%s/%s_ligand.sdf" % (pdbid, pdbid)
     protein = toolkit.readfile("pdb", protein_file, opt = {'b': None}).next()
     ligand = toolkit.readfile("sdf", ligand_file).next()
@@ -48,12 +50,16 @@ class rfscore(scorer):
         
         core_act = np.zeros(1, dtype=float)
         core_set = []
+        pdb_set = 'core'
         if pdbbind_version == '2007':
-            csv_file = pdbbind_dir + "/v" + pdbbind_version + "/INDEX." + pdbbind_version + ".core.data"
+            csv_file = '%s/v%s/INDEX.%s.%s.data' % (pdbbind_dir, pdbbind_version, pdbbind_version, pdb_set)
         else:
-            csv_file = pdbbind_dir + "/v" + pdbbind_version + "/INDEX_core_data." + pdbbind_version
+            csv_file = '%s/v%s/INDEX_%s_data.%s' % (pdbbind_dir, pdbbind_version, pdb_set, pdbbind_version)
         for row in csv.reader(_csv_file_filter(csv_file), delimiter=' '):
             pdbid = row[0]
+            if not isfile('%s/v%s/%s/%s_pocket.pdb' % (pdbbind_dir, pdbbind_version, pdbid, pdbid)):
+                continue
+                print 'skip '+ pdbid
             act = float(row[3])
             core_set.append(pdbid)
             core_act = np.vstack((core_act, act))
@@ -64,12 +70,15 @@ class rfscore(scorer):
         
         refined_act = np.zeros(1, dtype=float)
         refined_set = []
+        pdb_set = 'refined'
         if pdbbind_version == '2007':
-            csv_file = pdbbind_dir + "/v" + pdbbind_version + "/INDEX." + pdbbind_version + ".refined.data"
+            csv_file = '%s/v%s/INDEX.%s.%s.data' % (pdbbind_dir, pdbbind_version, pdbbind_version, pdb_set)
         else:
-            csv_file = pdbbind_dir + "/v" + pdbbind_version + "/INDEX_refined_data." + pdbbind_version
+            csv_file = '%s/v%s/INDEX_%s_data.%s' % (pdbbind_dir, pdbbind_version, pdb_set, pdbbind_version)
         for row in csv.reader(_csv_file_filter(csv_file), delimiter=' '):
             pdbid = row[0]
+            if not isfile('%s/v%s/%s/%s_pocket.pdb' % (pdbbind_dir, pdbbind_version, pdbid, pdbid)):
+                continue
             act = float(row[3])
             if pdbid in core_set:
                 continue
