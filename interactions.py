@@ -89,7 +89,7 @@ def hbond_acceptor_donor(mol1, mol2, cutoff = 3.5, base_angle = 120, tolerance =
     else:
         return a, d, np.array([], dtype=bool) 
     
-def hbond(mol1, mol2, **kwargs):
+def hbond(mol1, mol2, *args, **kwargs):
     """Calculates H-bonds between molecules
     
     Parameters
@@ -114,8 +114,8 @@ def hbond(mol1, mol2, **kwargs):
         strict : numpy array, dtype=bool
             Boolean array align with atom pairs, informing whether atoms form 'strict' H-bond (pass all angular cutoffs). If false, only distance cutoff is met, therefore the bond is 'crude'.
     """
-    a1, d1, s1 = hbond_acceptor_donor(mol1, mol2, **kwargs)
-    a2, d2, s2 = hbond_acceptor_donor(mol2, mol1, **kwargs)
+    a1, d1, s1 = hbond_acceptor_donor(mol1, mol2, *args, **kwargs)
+    a2, d2, s2 = hbond_acceptor_donor(mol2, mol1, *args, **kwargs)
     return np.concatenate((a1, d2)), np.concatenate((d1, a2)), np.concatenate((s1, s2))
 
 def halogenbond_acceptor_halogen(mol1, mol2, base_angle_acceptor = 120, base_angle_halogen = 180, tolerance = 30, cutoff = 4):
@@ -245,7 +245,7 @@ def salt_bridge_plus_minus(mol1, mol2, cutoff = 4):
     m1_plus, m2_minus = close_contacts(mol1.atom_dict[mol1.atom_dict['isplus']], mol2.atom_dict[mol2.atom_dict['isminus']], cutoff)
     return m1_plus, m2_minus
 
-def salt_bridges(mol1, mol2, **kwargs):
+def salt_bridges(mol1, mol2, *args, **kwargs):
     """Calculates salt bridges between molecules
     
     Parameters
@@ -262,8 +262,8 @@ def salt_bridges(mol1, mol2, **kwargs):
             Aligned arrays of atoms forming salt bridges
         
     """
-    m1_plus, m2_minus = salt_bridge_plus_minus(mol1, mol2, **kwargs)
-    m2_plus, m1_minus = salt_bridge_plus_minus(mol2, mol1, **kwargs)
+    m1_plus, m2_minus = salt_bridge_plus_minus(mol1, mol2, *args, **kwargs)
+    m2_plus, m1_minus = salt_bridge_plus_minus(mol2, mol1, *args, **kwargs)
     return np.concatenate((m1_plus, m1_minus)), np.concatenate((m2_minus, m2_plus))
 
 def hydrophobic_contacts(mol1, mol2, cutoff = 4):
