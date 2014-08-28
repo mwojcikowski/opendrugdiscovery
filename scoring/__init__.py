@@ -2,42 +2,6 @@ import numpy as np
 from sklearn.cross_validation import cross_val_score
 from sklearn.externals import joblib as pickle
 
-#class scorer(object):
-#    def __init__(self, model_instance, descriptor_generator_instance):
-#        self.model = model_instance
-#        self.descriptor_generator = descriptor_generator_instance
-#        
-#    def fit(self, ligands, target):
-#        self.train_descs = self.descriptor_generator.build(ligands)
-#        self.train_target = target
-#        return self.model.fit(self.train_descs,target)
-#    
-#    def predict(self, ligands):
-#        descs = self.descriptor_generator.build(ligands)
-#        return self.model.predict(descs)
-#    
-#    def score(self, ligands, target):
-#        descs = self.descriptor_generator.build(ligands)
-#        return self.model.score(descs,target)
-#    
-#    def cross_validate(n = 10, test_set = None, test_target = None):
-#        if test_set and test_target:
-#            cv_set = np.vstack((self.train_descs, test_set))
-#            cv_target = np.vstack((self.train_target, test_target))
-#        else:
-#            cv_set = self.train_descs
-#            cv_target = self.train_target
-#        return cross_val_score(self.model, cv_set, cv_target, cv = n)
-#        
-#    def save(self, filename):
-#        self.protein = None
-#        return pickle.dump(self, filename, compress=9)
-#    
-#    @classmethod
-#    def load(self, filename):
-#        return pickle.load(filename)
-
-
 ### FIX ### If possible make ensemble scorer lazy, for now it consumes all ligands
 class scorer(object):
     def __init__(self, model_instances, descriptor_generator_instances, score_title = 'score'):
@@ -56,7 +20,7 @@ class scorer(object):
             self.single_descriptor = True
         self.score_title = score_title
         
-    def fit(self, ligands, target):
+    def fit(self, ligands, target, *args, **kwargs):
         if self.single_descriptor:
             self.train_descs = self.descriptor_generator.build(ligands)
         else:
@@ -64,31 +28,31 @@ class scorer(object):
         self.train_target = target
         
         if self.single_model and self.single_descriptor:
-            return model.fit(self.train_descs,target)
+            return model.fit(self.train_descs,target, *args, **kwargs)
         elif self.single_model and not self.single_descriptor:
-            return [model.fit(desc,target) for desc in self.train_descs]
+            return [model.fit(desc,target, *args, **kwargs) for desc in self.train_descs]
         else:
-            return [model.fit(self.train_descs[n],target) for n, model in enumerate(self.model)]
+            return [model.fit(self.train_descs[n],target, *args, **kwargs) for n, model in enumerate(self.model)]
     
-    def predict(self, ligands):
+    def predict(self, ligands, *args, **kwargs):
         if self.single_model and self.single_descriptor:
             descs = self.descriptor_generator.build(ligands)
             return self.model.predict(descs)
         elif self.single_model and not self.single_descriptor:
-            return [self.model.predict(descs) for desc in self.train_descs]
+            return [self.model.predict(descs, *args, **kwargs) for desc in self.train_descs]
         else:
             descs = [desc_gen.build(ligands) for desc_gen in self.descriptor_generator]
-            return [model.predict(descs[n],target) for n, model in enumerate(self.model)]
+            return [model.predict(descs[n],target, *args, **kwargs) for n, model in enumerate(self.model)]
     
-    def score(self, ligands, target):
+    def score(self, ligands, target, *args, **kwargs):
         if self.single_model and self.single_descriptor:
             descs = self.descriptor_generator.build(ligands)
-            return self.model.score(descs)
+            return self.model.score(descs, *args, **kwargs)
         elif self.single_model and not self.single_descriptor:
-            return [self.model.score(descs) for desc in self.train_descs]
+            return [self.model.score(descs, *args, **kwargs) for desc in self.train_descs]
         else:
             descs = [desc_gen.build(ligands) for desc_gen in self.descriptor_generator]
-            return [model.score(descs[n],target) for n, model in enumerate(self.model)]
+            return [model.score(descs[n],target, *args, **kwargs) for n, model in enumerate(self.model)]
     
     def predict_ligands(self, ligands):
         # make lazy calculation
@@ -106,14 +70,14 @@ class scorer(object):
                 desc.protein = protein
     
     ### TODO ### Test
-    def cross_validate(n = 10, test_set = None, test_target = None):
+    def cross_validate(n = 10, test_set = None, test_target = None, n_jobs = 1):
         if test_set and test_target:
             cv_set = np.vstack((self.train_descs, test_set))
             cv_target = np.vstack((self.train_target, test_target))
         else:
             cv_set = self.train_descs
             cv_target = self.train_target
-        return cross_val_score(self.model, cv_set, cv_target, cv = n)
+        return cross_val_score(self.model, cv_set, cv_target, cv = n, n_jobs = n_jobs)
         
     def save(self, filename):
         self.protein = None
