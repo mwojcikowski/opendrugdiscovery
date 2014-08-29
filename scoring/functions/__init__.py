@@ -1,4 +1,4 @@
 from .RFScore import rfscore
-from .NNscore import nnscore
+from .NNScore import nnscore
 
 __all__ = ['rfscore', 'nnscore']
