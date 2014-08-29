@@ -53,6 +53,8 @@ class nnscore(scorer):
             csv_file = pdbbind_dir + "/v" + pdbbind_version + "/INDEX_core_data." + pdbbind_version
         for row in csv.reader(_csv_file_filter(csv_file), delimiter=' '):
             pdbid = row[0]
+            if not isfile('%s/v%s/%s/%s_pocket.pdb' % (pdbbind_dir, pdbbind_version, pdbid, pdbid)):
+                continue
             act = float(row[3])
             core_set.append(pdbid)
             core_act = np.vstack((core_act, act))
@@ -69,6 +71,8 @@ class nnscore(scorer):
             csv_file = pdbbind_dir + "/v" + pdbbind_version + "/INDEX_refined_data." + pdbbind_version
         for row in csv.reader(_csv_file_filter(csv_file), delimiter=' '):
             pdbid = row[0]
+            if not isfile('%s/v%s/%s/%s_pocket.pdb' % (pdbbind_dir, pdbbind_version, pdbid, pdbid)):
+                continue
             act = float(row[3])
             if pdbid in core_set:
                 continue
