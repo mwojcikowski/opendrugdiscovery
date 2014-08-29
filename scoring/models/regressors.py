@@ -1,3 +1,5 @@
+"""Collection of regressors models"""
+
 from sklearn.ensemble import RandomForestRegressor as randomforest
 from sklearn.svm import SVR as svm
 from sklearn.linear_model import LinearRegression as mlr
