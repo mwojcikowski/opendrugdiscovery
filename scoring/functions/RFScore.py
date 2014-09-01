@@ -59,7 +59,6 @@ class rfscore(scorer):
             pdbid = row[0]
             if not isfile('%s/v%s/%s/%s_pocket.pdb' % (pdbbind_dir, pdbbind_version, pdbid, pdbid)):
                 continue
-                print 'skip '+ pdbid
             act = float(row[3])
             core_set.append(pdbid)
             core_act = np.vstack((core_act, act))

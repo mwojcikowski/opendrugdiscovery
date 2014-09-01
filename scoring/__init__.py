@@ -69,13 +69,13 @@ class scorer(object):
             for desc in self.descriptor_generator:
                 desc.protein = protein
     
-    def cross_validate(n = 10, test_set = None, test_target = None, n_jobs = 1):
+    def cross_validate(self, n = 10, test_set = None, test_target = None, n_jobs = 1):
         if test_set and test_target:
-            cv_set = np.vstack((self.train_descs, test_set))
-            cv_target = np.vstack((self.train_target, test_target))
+            cv_set = np.vstack((self.train_descs, self.test_descs, test_set))
+            cv_target = np.vstack((self.train_target, self.test_target, test_target)).flatten()
         else:
-            cv_set = self.train_descs
-            cv_target = self.train_target
+            cv_set = np.vstack((self.train_descs, self.test_descs))
+            cv_target = np.vstack((self.train_target, self.test_target)).flatten()
         return cross_val_score(self.model, cv_set, cv_target, cv = n, n_jobs = n_jobs)
         
     def save(self, filename):
