@@ -35,6 +35,7 @@ import rdkit.Chem.AtomPairs.Torsions
 ### ODDT ###
 from rdkit.Chem.Lipinski import NumRotatableBonds
 from rdkit.Chem.AllChem import ComputeGasteigerCharges
+from rdkit.Chem.Pharm2D import Gobbi_Pharm2D,Generate
 
 # PIL and Tkinter
 try:
@@ -577,6 +578,8 @@ class Molecule(object):
             info = opt.get('bitInfo', None)
             radius = opt.get('radius', 4)
             fp = Fingerprint(Chem.rdMolDescriptors.GetMorganFingerprintAsBitVect(self.Mol,radius,bitInfo=info))
+        elif fptype == "pharm2d":
+            fp = Fingerprint(Generate.Gen2DFingerprint(self.Mol,Gobbi_Pharm2D.factory))
         else:
             raise ValueError, "%s is not a recognised RDKit Fingerprint type" % fptype
         return fp
@@ -836,7 +839,7 @@ class Fingerprint(object):
         return ", ".join([str(x) for x in _compressbits(self.fp)])
     @property
     def raw(self):
-        return np.array(self.fp, dtype=bool)
+        return np.array(self.fp)
 
 def _compressbits(bitvector, wordsize=32):
     """Compress binary vector into vector of long ints.

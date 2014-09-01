@@ -237,7 +237,7 @@ class Fingerprint(pybel.Fingerprint):
 
 def _unrollbits(fp, bitsperint):
     """ Unroll unsigned int fingerprint to bool """
-    ans = np.zeros(len(fp)*bitsperint, dtype=bool)
+    ans = np.zeros(len(fp)*bitsperint)
     start = 1
     for x in fp:
         i = start
