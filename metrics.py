@@ -2,9 +2,9 @@
 
 from math import ceil
 import numpy as np
-from sklearn.metrics import roc_curve as roc, roc_auc_score as roc_auc, auc
+from sklearn.metrics import roc_curve as roc, roc_auc_score as roc_auc, auc, mean_squared_error as mse
 
-__all__ = ['roc', 'auc', 'roc_auc', 'roc_log_auc', 'enrichment_factor', '_random_set']
+__all__ = ['roc', 'auc', 'roc_auc', 'roc_log_auc', 'enrichment_factor', 'random_roc_log_auc', 'mse']
 
 def enrichment_factor(y_true, y_score, percentage=1, pos_label=None):
     """Computes enrichment factor for given percentage, i.e. EF_1% is enrichment factor for first percent of given samples.
