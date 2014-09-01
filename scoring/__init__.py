@@ -69,7 +69,6 @@ class scorer(object):
             for desc in self.descriptor_generator:
                 desc.protein = protein
     
-    ### TODO ### Test
     def cross_validate(n = 10, test_set = None, test_target = None, n_jobs = 1):
         if test_set and test_target:
             cv_set = np.vstack((self.train_descs, test_set))
@@ -81,6 +80,11 @@ class scorer(object):
         
     def save(self, filename):
         self.protein = None
+        if self.single_descriptor:
+            self.descriptor_generator.protein = None
+        else:
+            for desc in self.descriptor_generator:
+                desc.protein = None
         return pickle.dump(self, filename, compress=9)
     
     @classmethod
