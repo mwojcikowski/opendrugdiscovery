@@ -43,7 +43,7 @@ class rfscore(scorer):
         descriptors = close_contacts(protein, cutoff = cutoff, protein_types = protein_atomic_nums, ligand_types = ligand_atomic_nums)
         super(rfscore,self).__init__(model, descriptors, score_title = 'rfscore')
     
-    def train(self, pdbbind_dir, pdbbind_version = '2007', sf_pickle = ''):
+    def gen_training_data(self, pdbbind_dir, pdbbind_version = '2007', sf_pickle = ''):
         # build train and test 
         cpus = self.n_jobs if self.n_jobs > 0 else None
         pool = Pool(processes=cpus)
@@ -90,28 +90,50 @@ class rfscore(scorer):
         
         self.train_descs = refined_desc
         self.train_target = refined_act
-        
         self.test_descs = core_desc
         self.test_target = core_act
         
-        self.model.fit(refined_desc, refined_act.flatten())
+        # save numpy arrays
+        np.savetxt(dirname(__file__) + '/RFScore/train_descs.csv', self.train_descs, fmt='%i', delimiter=',')
+        np.savetxt(dirname(__file__) + '/RFScore/train_target.csv', self.train_target, fmt='%.2f', delimiter=',')
+        np.savetxt(dirname(__file__) + '/RFScore/test_descs.csv', self.test_descs, fmt='%i', delimiter=',')
+        np.savetxt(dirname(__file__) + '/RFScore/test_target.csv', self.test_target, fmt='%.2f', delimiter=',')
         
-        r2 = self.model.score(core_desc, core_act.flatten())
+        
+    def train(self, sf_pickle = ''):
+        # load precomputed descriptors and target values
+        self.train_descs = np.loadtxt(dirname(__file__) + '/RFScore/train_descs.csv', delimiter=',', dtype=int)
+        self.train_target = np.loadtxt(dirname(__file__) + '/RFScore/train_target.csv', delimiter=',', dtype=float)
+        
+        self.test_descs = np.loadtxt(dirname(__file__) + '/RFScore/test_descs.csv', delimiter=',', dtype=int)
+        self.test_target = np.loadtxt(dirname(__file__) + '/RFScore/test_target.csv', delimiter=',', dtype=float)
+        
+        self.model.fit(self.train_descs, self.train_target)
+        
+        r2 = self.model.score(self.test_descs, self.test_target)
         r = np.sqrt(r2)
         print 'Test set: R**2:', r2, ' R:', r
         
-        rmse = np.sqrt(np.mean(np.square(self.model.oob_prediction_ - refined_act.flatten())))
-        r2 = self.model.score(refined_desc, refined_act.flatten())
+        rmse = np.sqrt(np.mean(np.square(self.model.oob_prediction_ - self.train_target)))
+        r2 = self.model.score(self.train_descs, self.train_target)
         r = np.sqrt(r2)
         print 'Train set: R**2:', r2, ' R:', r, 'RMSE:', rmse
         
         if sf_pickle:
-            self.save(sf_pickle)
+            return self.save(sf_pickle)
         else:
-            self.save(dirname(__file__) + '/RFScore.pickle')
+            return self.save('RFScore.pickle')
         
     @classmethod
     def load(self, filename = ''):
         if not filename:
-            filename = dirname(__file__) + '/RFScore.pickle'
+            for f in ['RFScore.pickle', dirname(__file__) + '/RFScore.pickle']:
+                if isfile(f):
+                    filename = f
+                    break
+        # if still no pickle found - train function from pregenerated descriptors
+        if not filename:
+            print "No pickle, training new scoring function."
+            rf = rfscore()
+            filename = rf.train()
         return scorer.load(filename)
