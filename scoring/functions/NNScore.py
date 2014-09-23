@@ -34,18 +34,14 @@ def _csv_file_filter(f):
         yield ' '.join(row.split())
 
 def _parallel_net_fit(data):
-    import os, sys
-    # block stdout - ffnet talks a lot
-    devnull = open(os.devnull, 'w')
-    tmp = sys.stdout
-    sys.stdout = devnull
     # train net
     net, descs, target = data
     net.fit(descs, target, train_alg='tnc', maxfun=1000)
-    # reactivate stdout
-    sys.stdout.flush()
-    sys.stdout = tmp
     return net
+
+def _parallel_helper(obj, methodname, *args, **kwargs):
+    """Private helper to workaround Python 2 pickle limitations"""
+    return getattr(obj, methodname)(*args, **kwargs)
 
 class nnscore(scorer):
     def __init__(self, protein = None, n_jobs = -1, **kwargs):
@@ -119,9 +115,12 @@ class nnscore(scorer):
         self.test_descs = np.loadtxt(dirname(__file__) + '/NNScore/test_descs.csv', delimiter=',', dtype=float)
         self.test_target = np.loadtxt(dirname(__file__) + '/NNScore/test_target.csv', delimiter=',', dtype=float)
         
+        n_dim = (~(self.train_descs == 0).all(axis=0) | ~((self.train_descs.min(axis=0) == self.train_descs.max(axis=0)))).sum()
+        
         # number of network to sample; original implementation did 1000, but 100 give results good enough.
         n = 100
-        trained_nets = Parallel(n_jobs=self.n_jobs)(delayed(_parallel_net_fit)((neuralnetwork([351,5,1]), self.train_descs, self.train_target)) for i in xrange(n))
+        #trained_nets = Parallel(n_jobs=self.n_jobs)(delayed(_parallel_net_fit)((neuralnetwork([n_dim,5,1]), self.train_descs, self.train_target)) for i in xrange(n))
+        trained_nets = Parallel(n_jobs=self.n_jobs)(delayed(_parallel_helper)(neuralnetwork([n_dim,5,1]), 'fit', self.train_descs, self.train_target, train_alg='tnc', maxfun=1000) for i in xrange(n))
         # get 20 best
         best_idx = np.array([net.score(self.test_descs, self.test_target.flatten()) for net in trained_nets]).argsort()[::-1][:20]
         self.model = ensemble_model([trained_nets[i] for i in best_idx])

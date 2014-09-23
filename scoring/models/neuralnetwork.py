@@ -8,7 +8,7 @@ from scipy.stats import linregress
 from sklearn.preprocessing import StandardScaler
 
 class neuralnetwork:
-    def __init__(self, shape = None, full_conn=True, biases=True, random_weights = True, normalize=True):
+    def __init__(self, shape = None, full_conn=True, biases=True, random_weights = True, normalize=True, reduce_empty_dims=True):
         """
         shape: shape of a NN given as a tuple
         """
@@ -17,13 +17,15 @@ class neuralnetwork:
         self.biases = biases
         self.random_weights = random_weights
         self.normalize = normalize
+        self.reduce_empty_dims = reduce_empty_dims
         if self.normalize:
             self.norm = StandardScaler()
+        self.shape = shape
         if shape:
-            if full_conn:
-                conec = tmlgraph(shape, biases)
+            if self.full_conn:
+                conec = tmlgraph(self.shape, self.biases)
             else:
-                conec = mlgraph(shapebiases)
+                conec = mlgraph(self.shape, self.biases)
             self.model = ffnet(conec)
             if random_weights:
                 self.model.randomweights()
@@ -36,6 +38,9 @@ class neuralnetwork:
         return self
     
     def fit(self, input_descriptors, target_values, train_alg='tnc', **kwargs):
+        if self.reduce_empty_dims:
+            self.desc_mask = np.argwhere(~(input_descriptors == 0).all(axis=0) | ~((input_descriptors.min(axis=0) == input_descriptors.max(axis=0)))).flatten()
+            input_descriptors = input_descriptors[:,self.desc_mask]
         if self.normalize:
             descs = self.norm.fit_transform(input_descriptors)
         else:
@@ -44,6 +49,8 @@ class neuralnetwork:
         return self
     
     def predict(self, input_descriptors):
+        if self.reduce_empty_dims:
+            input_descriptors = input_descriptors[:,self.desc_mask]
         if self.normalize:
             descs = self.norm.fit_transform(input_descriptors)
         else:
