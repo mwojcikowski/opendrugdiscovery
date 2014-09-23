@@ -33,12 +33,6 @@ def _csv_file_filter(f):
             continue
         yield ' '.join(row.split())
 
-def _parallel_net_fit(data):
-    # train net
-    net, descs, target = data
-    net.fit(descs, target, train_alg='tnc', maxfun=1000)
-    return net
-
 def _parallel_helper(obj, methodname, *args, **kwargs):
     """Private helper to workaround Python 2 pickle limitations"""
     return getattr(obj, methodname)(*args, **kwargs)
@@ -119,7 +113,6 @@ class nnscore(scorer):
         
         # number of network to sample; original implementation did 1000, but 100 give results good enough.
         n = 100
-        #trained_nets = Parallel(n_jobs=self.n_jobs)(delayed(_parallel_net_fit)((neuralnetwork([n_dim,5,1]), self.train_descs, self.train_target)) for i in xrange(n))
         trained_nets = Parallel(n_jobs=self.n_jobs)(delayed(_parallel_helper)(neuralnetwork([n_dim,5,1]), 'fit', self.train_descs, self.train_target, train_alg='tnc', maxfun=1000) for i in xrange(n))
         # get 20 best
         best_idx = np.array([net.score(self.test_descs, self.test_target.flatten()) for net in trained_nets]).argsort()[::-1][:20]
