@@ -39,7 +39,7 @@ class neuralnetwork:
     
     def fit(self, input_descriptors, target_values, train_alg='tnc', **kwargs):
         if self.reduce_empty_dims:
-            self.desc_mask = np.argwhere(~(input_descriptors == 0).all(axis=0) | ~((input_descriptors.min(axis=0) == input_descriptors.max(axis=0)))).flatten()
+            self.desc_mask = np.argwhere(~((input_descriptors == 0).all(axis=0) | (input_descriptors.min(axis=0) == input_descriptors.max(axis=0)))).flatten()
             input_descriptors = input_descriptors[:,self.desc_mask]
         if self.normalize:
             descs = self.norm.fit_transform(input_descriptors)
