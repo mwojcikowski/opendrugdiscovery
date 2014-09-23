@@ -57,6 +57,9 @@ class Molecule(pybel.Molecule):
     def num_rotors(self):
         return self.OBMol.NumRotors()
     
+    def _repr_html_():
+        return self.write('svg')
+    
     @property
     def atom_dict(self):
         # check cache and generate dicts
