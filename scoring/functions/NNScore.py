@@ -3,9 +3,10 @@ from os.path import dirname, isfile
 import numpy as np
 from multiprocessing import Pool
 import warnings
+from sklearn.externals.joblib import Parallel, delayed
 
 from oddt import toolkit
-from oddt.scoring import scorer
+from oddt.scoring import scorer, ensemble_model
 from oddt.scoring.descriptors.binana import binana_descriptor
 from oddt.scoring.models.regressors import neuralnetwork
 
@@ -32,6 +33,20 @@ def _csv_file_filter(f):
             continue
         yield ' '.join(row.split())
 
+def _parallel_net_fit(data):
+    import os, sys
+    # block stdout - ffnet talks a lot
+    devnull = open(os.devnull, 'w')
+    tmp = sys.stdout
+    sys.stdout = devnull
+    # train net
+    net, descs, target = data
+    net.fit(descs, target, train_alg='tnc', maxfun=1000)
+    # reactivate stdout
+    sys.stdout.flush()
+    sys.stdout = tmp
+    return net
+
 class nnscore(scorer):
     def __init__(self, protein = None, n_jobs = -1, **kwargs):
         self.protein = protein
@@ -40,17 +55,18 @@ class nnscore(scorer):
         decsriptors = binana_descriptor(protein)
         super(nnscore,self).__init__(model, decsriptors, score_title='nnscore')
     
-    def train(self, pdbbind_dir, pdbbind_version = '2007', sf_pickle = ''):
+    def gen_training_data(self, pdbbind_dir, pdbbind_version = '2007', sf_pickle = ''):
         # build train and test 
         cpus = self.n_jobs if self.n_jobs > 0 else None
         pool = Pool(processes=cpus)
         
         core_act = np.zeros(1, dtype=float)
         core_set = []
+        pdb_set = 'core'
         if pdbbind_version == '2007':
-            csv_file = pdbbind_dir + "/v" + pdbbind_version + "/INDEX." + pdbbind_version + ".core.data"
+            csv_file = '%s/v%s/INDEX.%s.%s.data' % (pdbbind_dir, pdbbind_version, pdbbind_version, pdb_set)
         else:
-            csv_file = pdbbind_dir + "/v" + pdbbind_version + "/INDEX_core_data." + pdbbind_version
+            csv_file = '%s/v%s/INDEX_%s_data.%s' % (pdbbind_dir, pdbbind_version, pdb_set, pdbbind_version)
         for row in csv.reader(_csv_file_filter(csv_file), delimiter=' '):
             pdbid = row[0]
             if not isfile('%s/v%s/%s/%s_pocket.pdb' % (pdbbind_dir, pdbbind_version, pdbid, pdbid)):
@@ -65,10 +81,11 @@ class nnscore(scorer):
         
         refined_act = np.zeros(1, dtype=float)
         refined_set = []
+        pdb_set = 'refined'
         if pdbbind_version == '2007':
-            csv_file = pdbbind_dir + "/v" + pdbbind_version + "/INDEX." + pdbbind_version + ".refined.data"
+            csv_file = '%s/v%s/INDEX.%s.%s.data' % (pdbbind_dir, pdbbind_version, pdbbind_version, pdb_set)
         else:
-            csv_file = pdbbind_dir + "/v" + pdbbind_version + "/INDEX_refined_data." + pdbbind_version
+            csv_file = '%s/v%s/INDEX_%s_data.%s' % (pdbbind_dir, pdbbind_version, pdb_set, pdbbind_version)
         for row in csv.reader(_csv_file_filter(csv_file), delimiter=' '):
             pdbid = row[0]
             if not isfile('%s/v%s/%s/%s_pocket.pdb' % (pdbbind_dir, pdbbind_version, pdbid, pdbid)):
@@ -79,25 +96,59 @@ class nnscore(scorer):
             refined_set.append(pdbid)
             refined_act = np.vstack((refined_act, act))
         
-        #result = [generate_descriptor((pdbid, self.descriptor_generator, pdbbind_dir, pdbbind_version)) for pdbid in refined_set]
         result = pool.map(generate_descriptor, [(pdbid, self.descriptor_generator, pdbbind_dir, pdbbind_version) for pdbid in refined_set])
         refined_desc = np.vstack(result)
         refined_act = refined_act[1:]
         
         self.train_descs = refined_desc
-        self.train_target = refined_act
-        
+        self.train_target = refined_act.flatten()
         self.test_descs = core_desc
-        self.test_target = core_act
+        self.test_target = core_act.flatten()
+        
+        # save numpy arrays
+        np.savetxt(dirname(__file__) + '/NNScore/train_descs.csv', self.train_descs, fmt='%.5g', delimiter=',')
+        np.savetxt(dirname(__file__) + '/NNScore/train_target.csv', self.train_target, fmt='%.2f', delimiter=',')
+        np.savetxt(dirname(__file__) + '/NNScore/test_descs.csv', self.test_descs, fmt='%.5g', delimiter=',')
+        np.savetxt(dirname(__file__) + '/NNScore/test_target.csv', self.test_target, fmt='%.2f', delimiter=',')
+        
+        
+    def train(self, sf_pickle = ''):
+        # load precomputed descriptors and target values
+        self.train_descs = np.loadtxt(dirname(__file__) + '/NNScore/train_descs.csv', delimiter=',', dtype=float)
+        self.train_target = np.loadtxt(dirname(__file__) + '/NNScore/train_target.csv', delimiter=',', dtype=float)
+        self.test_descs = np.loadtxt(dirname(__file__) + '/NNScore/test_descs.csv', delimiter=',', dtype=float)
+        self.test_target = np.loadtxt(dirname(__file__) + '/NNScore/test_target.csv', delimiter=',', dtype=float)
+        
+        # number of network to sample; original implementation did 1000, but 100 give results good enough.
+        n = 100
+        trained_nets = Parallel(n_jobs=self.n_jobs)(delayed(_parallel_net_fit)((neuralnetwork([351,5,1]), self.train_descs, self.train_target)) for i in xrange(n))
+        # get 20 best
+        best_idx = np.array([net.score(self.test_descs, self.test_target.flatten()) for net in trained_nets]).argsort()[::-1][:20]
+        self.model = ensemble_model([trained_nets[i] for i in best_idx])
+        
+        r2 = self.model.score(self.test_descs, self.test_target)
+        r = np.sqrt(r2)
+        print 'Test set: R**2:', r2, ' R:', r
+        
+        r2 = self.model.score(self.train_descs, self.train_target)
+        r = np.sqrt(r2)
+        print 'Train set: R**2:', r2, ' R:', r
         
         if sf_pickle:
-            self.save(sf_pickle)
+            return self.save(sf_pickle)
         else:
-            self.save(dirname(__file__) + '/NNscore.pickle')
+            return self.save('NNScore.pickle')
         
     @classmethod
     def load(self, filename = ''):
         if not filename:
-            filename = dirname(__file__) + '/NNscore.pickle'
+            for f in ['NNScore.pickle', dirname(__file__) + '/NNScore.pickle']:
+                if isfile(f):
+                    filename = f
+                    break
+        # if still no pickle found - train function from pregenerated descriptors
+        if not filename:
+            print "No pickle, training new scoring function."
+            nn = nnscore()
+            filename = nn.train()
         return scorer.load(filename)
-

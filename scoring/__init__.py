@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.stats import linregress
 from sklearn.cross_validation import cross_val_score
 from sklearn.externals import joblib as pickle
 
@@ -6,7 +7,7 @@ from sklearn.externals import joblib as pickle
 class scorer(object):
     def __init__(self, model_instances, descriptor_generator_instances, score_title = 'score'):
         self.model = model_instances
-        if type(descriptor_generator_instances) is list:
+        if type(model_instances) is list:
             self.single_model = False
         else:
             self.single_model = True
@@ -90,3 +91,19 @@ class scorer(object):
     @classmethod
     def load(self, filename):
         return pickle.load(filename)
+    
+
+class ensemble_model(object):
+    def __init__(self, models):
+        self._models = models if len(models) else None
+    
+    def fit(self, X, y, *args, **kwargs):
+        for model in self._models:
+            model.fit(X, y, *args, **kwargs)
+        return self
+    
+    def predict(self, X, *args, **kwargs):
+        return np.array([model.predict(X, *args, **kwargs) for model in self._models]).mean(axis=0)
+    
+    def score(self, X, y, *args, **kwargs):
+        return linregress(self.predict(X, *args, **kwargs).flatten(), y.flatten())[2]**2

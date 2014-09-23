@@ -1,3 +1,6 @@
+# HACK import BFGS before ffnet, otherwise it will segfault when trying to use BFGS
+from scipy.optimize import fmin_l_bfgs_b
+fmin_l_bfgs_b
 ## FIX use ffnet for now, use sklearn in future
 from ffnet import ffnet,mlgraph,tmlgraph
 import numpy as np
