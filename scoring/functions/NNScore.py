@@ -112,7 +112,7 @@ class nnscore(scorer):
         n_dim = (~((self.train_descs == 0).all(axis=0) | (self.train_descs.min(axis=0) == self.train_descs.max(axis=0)))).sum()
         
         # number of network to sample; original implementation did 1000, but 100 give results good enough.
-        n = 100
+        n = 1000
         trained_nets = Parallel(n_jobs=self.n_jobs)(delayed(_parallel_helper)(neuralnetwork([n_dim,5,1]), 'fit', self.train_descs, self.train_target, train_alg='tnc', maxfun=1000) for i in xrange(n))
         # get 20 best
         best_idx = np.array([net.score(self.test_descs, self.test_target.flatten()) for net in trained_nets]).argsort()[::-1][:20]
