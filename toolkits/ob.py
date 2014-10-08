@@ -46,6 +46,10 @@ class Molecule(pybel.Molecule):
             self._charges = np.array([atom.partialcharge for atom in self.atoms])
         return self._charges
     
+    ### Backport code implementing resudues (by me) to support older versions of OB (aka 'stable')
+    @property
+    def residue(self): return Residue(self.OBAtom.GetResidue())
+    
     #### Custom ODDT properties ####
     def __getattr__(self, attr):
         for desc in pybel._descdict.keys():
@@ -230,8 +234,51 @@ class Atom(pybel.Atom):
     @property
     def neighbors(self):
         return [Atom(a) for a in OBAtomAtomIter(self.OBAtom)]
+    @property
+    def residue(self):
+        return Residue(self.OBAtom.GetResidue())
 
 pybel.Atom = Atom
+
+class Residue(object):
+    """Represent a Pybel residue.
+
+    Required parameter:
+       OBResidue -- an Open Babel OBResidue
+
+    Attributes:
+       atoms, idx, name.
+
+    (refer to the Open Babel library documentation for more info).
+
+    The original Open Babel atom can be accessed using the attribute:
+       OBResidue
+    """
+
+    def __init__(self, OBResidue):
+        self.OBResidue = OBResidue
+
+    @property
+    def atoms(self):
+        return [Atom(atom) for atom in ob.OBResidueAtomIter(self.OBResidue)]
+
+    @property
+    def idx(self):
+        return self.OBResidue.GetIdx()
+
+    @property
+    def name(self):
+        return self.OBResidue.GetName()
+
+    def __iter__(self):
+        """Iterate over the Atoms of the Residue.
+
+        This allows constructions such as the following:
+           for atom in residue:
+               print atom
+        """
+        return iter(self.atoms)
+
 
 class Fingerprint(pybel.Fingerprint):
     @property
