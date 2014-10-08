@@ -72,7 +72,7 @@ class virtualscreening:
             sf = nnscore.load()
             sf.set_protein(protein)
         else:
-            raise ValueError('Docking engine %s was not implemented in ODDT' % t)
+            raise ValueError('Scoring Function %s was not implemented in ODDT' % function)
         self._pipe = sf.predict_ligands(self._pipe)
     
     def fetch(self):

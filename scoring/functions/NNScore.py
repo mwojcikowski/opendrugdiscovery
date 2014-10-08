@@ -41,7 +41,7 @@ class nnscore(scorer):
     def __init__(self, protein = None, n_jobs = -1, **kwargs):
         self.protein = protein
         self.n_jobs = n_jobs
-        model = []
+        model = None
         decsriptors = binana_descriptor(protein)
         super(nnscore,self).__init__(model, decsriptors, score_title='nnscore')
     
@@ -130,7 +130,7 @@ class nnscore(scorer):
             return self.save(sf_pickle)
         else:
             return self.save('NNScore.pickle')
-        
+    
     @classmethod
     def load(self, filename = ''):
         if not filename:

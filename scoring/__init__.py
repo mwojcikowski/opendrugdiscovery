@@ -65,10 +65,16 @@ class scorer(object):
     def set_protein(self, protein):
         self.protein = protein
         if self.single_descriptor:
-            self.descriptor_generator.protein = protein
+            if hasattr(self.descriptor_generator, 'set_protein'):
+                self.descriptor_generator.set_protein(protein)
+            else:
+                self.descriptor_generator.protein = protein
         else:
             for desc in self.descriptor_generator:
-                desc.protein = protein
+                if hasattr(desc, 'set_protein'):
+                    desc.set_protein(protein)
+                else:
+                    desc.protein = protein
     
     def cross_validate(self, n = 10, test_set = None, test_target = None, n_jobs = 1):
         if test_set and test_target:

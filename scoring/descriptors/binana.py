@@ -25,6 +25,20 @@ class binana_descriptor:
         cc_25_types = [('A', 'A'), ('A', 'C'), ('A', 'CL'), ('A', 'F'), ('A', 'FE'), ('A', 'HD'), ('A', 'MG'), ('A', 'MN'), ('A', 'N'), ('A', 'NA'), ('A', 'OA'), ('A', 'SA'), ('A', 'ZN'), ('BR', 'C'), ('BR', 'HD'), ('BR', 'OA'), ('C', 'C'), ('C', 'CL'), ('C', 'F'), ('C', 'HD'), ('C', 'MG'), ('C', 'MN'), ('C', 'N'), ('C', 'NA'), ('C', 'OA'), ('C', 'SA'), ('C', 'ZN'), ('CD', 'OA'), ('CL', 'FE'), ('CL', 'HD'), ('CL', 'MG'), ('CL', 'N'), ('CL', 'OA'), ('CL', 'ZN'), ('F', 'HD'), ('F', 'N'), ('F', 'OA'), ('F', 'SA'), ('F', 'ZN'), ('FE', 'HD'), ('FE', 'N'), ('FE', 'OA'), ('HD', 'HD'), ('HD', 'I'), ('HD', 'MG'), ('HD', 'MN'), ('HD', 'N'), ('HD', 'NA'), ('HD', 'OA'), ('HD', 'P'), ('HD', 'S'), ('HD', 'SA'), ('HD', 'ZN'), ('MG', 'NA'), ('MG', 'OA'), ('MN', 'N'), ('MN', 'OA'), ('N', 'N'), ('N', 'NA'), ('N', 'OA'), ('N', 'SA'), ('N', 'ZN'), ('NA', 'OA'), ('NA', 'SA'), ('NA', 'ZN'), ('OA', 'OA'), ('OA', 'SA'), ('OA', 'ZN'), ('S', 'ZN'), ('SA', 'ZN')]
         cc_25_rec_types, cc_25_lig_types = zip(*cc_25_types)
         self.cc_25 = close_contacts(protein, cutoff=2.5, protein_types=cc_25_rec_types, ligand_types=cc_25_lig_types, mode='atom_types_ad4', aligned_pairs=True)
+    
+        
+    def set_protein(self, protein):
+        """ One function to change all relevant proteins
+        
+        Parameters
+        ----------
+            protein: oddt.toolkit.Molecule object
+                Protein object to be used while generating descriptors. Protein becomes new global and default protein.
+        """
+        self.protein = protein
+        self.vina.set_protein(protein)
+        self.cc_4.protein = protein
+        self.cc_25.protein = protein
         
     def build(self, ligands, protein = None):
         """ Descriptor building method
@@ -43,10 +57,9 @@ class binana_descriptor:
                 An array of binana descriptors, aligned with input ligands
         """
         if protein:
-            self.protein = protein
-            self.vina.set_protein(protein)
-            self.cc_4.protein = protein
-            self.cc_25.protein = protein
+            self.set_protein(protein)
+        else:
+            protein = self.protein
         protein_dict = protein.atom_dict
         desc = None
         for mol in ligands:
