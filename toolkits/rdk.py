@@ -19,6 +19,7 @@ Global variables:
 """
 
 import os
+from copy import copy
 
 import numpy as np
 
@@ -334,6 +335,16 @@ class Molecule(object):
         if self._ring_dict is None:
             self._dicts()
         return self._ring_dict
+    
+    @property
+    def clone(self):
+        return Molecule(copy(self.Mol))
+    
+    def clone_coords(self, source):
+        self.Mol.RemoveAllConformers()
+        for conf in source.Mol.GetConformers():
+            self.Mol.AddConformer(conf)
+        return self
     
     def _dicts(self):
         # Atoms

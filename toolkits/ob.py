@@ -85,6 +85,14 @@ class Molecule(pybel.Molecule):
             self._dicts()
         return self._ring_dict
     
+    @property
+    def clone(self):
+        return Molecule(ob.OBMol(self.OBMol))
+    
+    def clone_coords(self, source):
+        self.OBMol.SetCoordinates(source.OBMol.GetCoordinates())
+        return self
+    
     def _dicts(self):
         # Atoms
         atom_dtype = [('id', 'int16'),

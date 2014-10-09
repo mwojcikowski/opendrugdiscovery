@@ -105,9 +105,14 @@ class autodock_vina:
             ligand_outfile = ligand_dir + '/' + str(n) + '_' + ligand.title + '_out.pdbqt'
             ligand.write('pdbqt', ligand_file, overwrite=True)
             vina = parse_vina_docking_output(subprocess.check_output([self.executable, '--receptor', self.protein_file, '--ligand', ligand_file, '--out', ligand_outfile] + self.params, stderr=subprocess.STDOUT))
-            for lig, scores in zip([lig for lig in toolkit.readfile('pdbqt', ligand_outfile)], vina):
-                lig.data.update(scores)
-                output_array.append(lig)
+            ### HACK # overcome connectivity problems in obabel
+            source_ligand = toolkit.readfile('pdbqt', ligand_file).next()
+            for lig, scores in zip([lig for lig in toolkit.readfile('pdbqt', ligand_outfile, opt={'b': None})], vina):
+                ### HACK # copy data from source
+                clone = source_ligand.clone
+                clone.clone_coords(lig)
+                clone.data.update(scores)
+                output_array.append(clone)
         if single:
             remove(ligand_file)
         else:
