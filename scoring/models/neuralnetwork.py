@@ -55,7 +55,7 @@ class neuralnetwork:
             descs = self.norm.fit_transform(input_descriptors)
         else:
             descs = input_descriptors
-        return np.array(self.model.call(descs))
+        return np.squeeze(self.model.call(descs), axis=1)
     
     def score(self, X, y):
         return linregress(self.predict(X).flatten(), y)[2]**2
