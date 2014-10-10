@@ -9,7 +9,7 @@ from random import random
 from oddt import toolkit
 
 class autodock_vina:
-    def __init__(self, protein=None, size=(10,10,10), center=(0,0,0), auto_ligand=None, exhaustivness=8, num_modes=9, energy_range=3, seed=None, prefix_dir='/tmp', ncpu=1, executable=None, autocleanup=True):
+    def __init__(self, protein=None, size=(10,10,10), center=(0,0,0), auto_ligand=None, exhaustivness=8, num_modes=9, energy_range=3, seed=None, prefix_dir='/tmp', n_cpu=1, executable=None, autocleanup=True):
         self.dir = prefix_dir
         # define binding site
         self.size = size
@@ -38,7 +38,7 @@ class autodock_vina:
         self.params = []
         self.params = self.params + ['--center_x', str(self.center[0]), '--center_y', str(self.center[1]), '--center_z', str(self.center[2])]
         self.params = self.params + ['--size_x', str(self.size[0]), '--size_y', str(self.size[1]), '--size_z', str(self.size[2])]
-        self.params = self.params + ['--cpu', str(ncpu)]
+        self.params = self.params + ['--cpu', str(n_cpu)]
         self.params = self.params + ['--exhaustiveness', str(exhaustivness)]
         if not seed is None:
             self.params = self.params + ['--seed', str(seed)]

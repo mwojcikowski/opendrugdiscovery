@@ -1,13 +1,21 @@
 import csv
+from multiprocessing import Pool
 from oddt import toolkit
 
+def _parallel_helper(args):
+    """Private helper to workaround Python 2 pickle limitations"""
+    obj, methodname, arg = args
+    return getattr(obj, methodname)(**arg)
+
 class virtualscreening:
-    def __init__(self, cpus=-1, verbose=False):
+    def __init__(self, n_cpu=-1, verbose=False):
         self._pipe = None
-        self.cpus = cpus
+        self.n_cpu = n_cpu
         self.num_input = 0
         self.num_output = 0
         self.verbose = verbose
+        # setup pool
+        self._pool = Pool(n_cpu if n_cpu > 0 else None)
         
     def load_ligands(self, file_type, ligands_file):
         self._pipe = self._ligand_pipe(toolkit.readfile(file_type, ligands_file))
@@ -46,7 +54,7 @@ class virtualscreening:
     def dock(self, engine, protein, *args, **kwargs):
         if engine.lower() == 'autodock_vina':
             from .docking.autodock_vina import autodock_vina
-            engine = autodock_vina(protein, ncpu=self.cpus, *args, **kwargs)
+            engine = autodock_vina(protein, *args, **kwargs)
         else:
             raise ValueError('Docking engine %s was not implemented in ODDT' % engine)
         def _iter_conf(results):
@@ -54,7 +62,10 @@ class virtualscreening:
             for confs in results:
                 for conf in confs:
                     yield conf
-        docking_results = (engine.dock(lig, single=True) for lig in self._pipe)
+        if self.n_cpu != 1:
+            docking_results = self._pool.imap(_parallel_helper, ((engine, "dock", {'ligands':lig, 'single': True}) for lig in self._pipe))
+        else:
+            docking_results = (engine.dock(lig, single=True) for lig in self._pipe)
         self._pipe = _iter_conf(docking_results)
         
     def score(self, function, protein, *args, **kwargs):
@@ -73,7 +84,10 @@ class virtualscreening:
             sf.set_protein(protein)
         else:
             raise ValueError('Scoring Function %s was not implemented in ODDT' % function)
-        self._pipe = sf.predict_ligands(self._pipe)
+        if self.n_cpu != 1:
+            self._pipe = self._pool.imap(_parallel_helper, ((sf, 'predict', {'ligands': [lig]}) for lig in self._pipe))
+        else:
+            self._pipe = sf.predict_ligands(self._pipe)
     
     def fetch(self):
         for n, mol in enumerate(self._pipe):
