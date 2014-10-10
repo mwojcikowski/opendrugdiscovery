@@ -11,6 +11,7 @@ from oddt import toolkit
 class autodock_vina:
     def __init__(self, protein=None, size=(10,10,10), center=(0,0,0), auto_ligand=None, exhaustivness=8, num_modes=9, energy_range=3, seed=None, prefix_dir='/tmp', n_cpu=1, executable=None, autocleanup=True):
         self.dir = prefix_dir
+        self._tmp_dir = None
         # define binding site
         self.size = size
         self.center = center
@@ -28,8 +29,8 @@ class autodock_vina:
         # detect version
         self.version = subprocess.check_output([self.executable, '--version']).split(' ')[2]
         self.autocleanup = autocleanup
+        self.cleanup_dirs = set()
         
-        self.tmp_dir = mkdtemp(dir = self.dir, prefix='autodock_vina_')
         # share protein to class
         if protein:
             self.set_protein(protein)
@@ -45,9 +46,20 @@ class autodock_vina:
         self.params = self.params + ['--num_modes', str(num_modes)]
         self.params = self.params + ['--energy_range', str(energy_range)]
     
+    @property
+    def tmp_dir(self):
+        if not self._tmp_dir:
+            self._tmp_dir = mkdtemp(dir = self.dir, prefix='autodock_vina_')
+            self.cleanup_dirs.add(self._tmp_dir)
+        return self._tmp_dir
+    
+    @tmp_dir.setter
+    def tmp_dir(self, value):
+        self._tmp_dir = value
+    
     def set_protein(self, protein):
         # generate new directory
-        self.tmp_dir = mkdtemp(dir = self.dir, prefix='autodock_vina_')
+        self._tmp_dir = None
         self.protein = protein
         if type(protein) is str:
             extension = protein.split('.')[-1]
@@ -65,14 +77,11 @@ class autodock_vina:
             self.protein.write('pdbqt', self.protein_file, opt={'r':None,}, overwrite=True)
     
     def score(self, ligands, protein = None, single = False):
-        if single:
-            ligands = [ligands]
-        if single:
-            ligand_dir = self.tmp_dir
-        else:
-            ligand_dir = mkdtemp(dir = self.tmp_dir, prefix='ligands_')
         if protein:
             self.set_protein(protein)
+        if single:
+            ligands = [ligands]
+        ligand_dir = mkdtemp(dir = self.tmp_dir, prefix='ligands_')
         output_array = []
         for n, ligand in enumerate(ligands):
             # write ligand to file
@@ -81,24 +90,16 @@ class autodock_vina:
             scores = parse_vina_scoring_output(subprocess.check_output([self.executable, '--score_only', '--receptor', self.protein_file, '--ligand', ligand_file] + self.params, stderr=subprocess.STDOUT))
             ligand.data.update(scores)
             output_array.append(ligand)
-        if single:
-            remove(ligand_file)
-        else:
-            rmtree(ligand_dir)
+        rmtree(ligand_dir)
         return output_array
             
     def dock(self, ligands, protein = None, single = False):
-        if single:
-            ligands = [ligands]
-        output_array = []
-        if single:
-            ligand_dir = self.tmp_dir
-        else:
-            ligand_dir = mkdtemp(dir = self.tmp_dir, prefix='ligands_')
         if protein:
             self.set_protein(protein)
-        output_array = []
+        if single:
+            ligands = [ligands]
         ligand_dir = mkdtemp(dir = self.tmp_dir, prefix='ligands_')
+        output_array = []
         for n, ligand in enumerate(ligands):
             # write ligand to file
             ligand_file = ligand_dir + '/' + str(n) + '_' + ligand.title + '.pdbqt'
@@ -113,14 +114,12 @@ class autodock_vina:
                 clone.clone_coords(lig)
                 clone.data.update(scores)
                 output_array.append(clone)
-        if single:
-            remove(ligand_file)
-        else:
-            rmtree(ligand_dir)
+        rmtree(ligand_dir)
         return output_array
     
     def clean(self):
-        rmtree(self.tmp_dir)
+        for d in self.cleanup_dirs:
+            rmtree(d)
     
 def parse_vina_scoring_output(output):
     out = {}

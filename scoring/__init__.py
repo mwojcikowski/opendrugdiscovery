@@ -56,8 +56,8 @@ class scorer(object):
             return [model.score(descs[n],target, *args, **kwargs) for n, model in enumerate(self.model)]
     
     def predict_ligand(self, ligand):
-        score = self.predict([ligand])
-        ligand.data.update({self.score_title: score[0]})
+        score = self.predict([ligand])[0]
+        ligand.data.update({self.score_title: score})
         return ligand
     
     def predict_ligands(self, ligands):
