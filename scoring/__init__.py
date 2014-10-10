@@ -55,12 +55,15 @@ class scorer(object):
             descs = [desc_gen.build(ligands) for desc_gen in self.descriptor_generator]
             return [model.score(descs[n],target, *args, **kwargs) for n, model in enumerate(self.model)]
     
+    def predict_ligand(self, ligand):
+        score = self.predict([ligand])
+        ligand.data.update({self.score_title: score[0]})
+        return ligand
+    
     def predict_ligands(self, ligands):
         # make lazy calculation
         for lig in ligands:
-            score = self.predict([lig])
-            lig.data.update({self.score_title: score[0]})
-            yield lig
+            yield self.predict_ligand(lig)
     
     def set_protein(self, protein):
         self.protein = protein

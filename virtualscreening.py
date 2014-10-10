@@ -1,5 +1,5 @@
 import csv
-from multiprocessing import Pool
+from multiprocessing.dummy import Pool
 from oddt import toolkit
 
 def _parallel_helper(args):
@@ -85,7 +85,7 @@ class virtualscreening:
         else:
             raise ValueError('Scoring Function %s was not implemented in ODDT' % function)
         if self.n_cpu != 1:
-            self._pipe = self._pool.imap(_parallel_helper, ((sf, 'predict', {'ligands': [lig]}) for lig in self._pipe))
+            self._pipe = self._pool.imap(_parallel_helper, ((sf, 'predict_ligand', {'ligand': lig}) for lig in self._pipe))
         else:
             self._pipe = sf.predict_ligands(self._pipe)
     
