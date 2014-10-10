@@ -7,7 +7,7 @@ from oddt.docking.autodock_vina import autodock_vina
 from oddt.scoring.descriptors import atoms_by_type, close_contacts
 from oddt import interactions
 
-class binana_descriptor:
+class binana_descriptor(object):
     def __init__(self, protein = None):
         """ Descriptor build from binana script (as used in NNScore 2.0
         
@@ -181,3 +181,6 @@ class binana_descriptor:
             desc = np.vstack((desc, np.array(vec, dtype=float)))
         
         return desc[1:]
+    
+    def __reduce__(self):
+        return binana_descriptor, ()

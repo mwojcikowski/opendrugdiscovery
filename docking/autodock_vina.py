@@ -8,7 +8,7 @@ import re
 from random import random
 from oddt import toolkit
 
-class autodock_vina:
+class autodock_vina(object):
     def __init__(self, protein=None, size=(10,10,10), center=(0,0,0), auto_ligand=None, exhaustivness=8, num_modes=9, energy_range=3, seed=None, prefix_dir='/tmp', n_cpu=1, executable=None, autocleanup=True):
         self.dir = prefix_dir
         self._tmp_dir = None
