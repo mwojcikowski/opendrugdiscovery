@@ -16,6 +16,5 @@ setup(name='ODDT',
                     'oddt.scoring.descriptors',
                     'oddt.docking',
                     ],
-#    package_dir={'oddt': ''}, 
     package_data={'oddt.scoring.functions': ['NNScore/*.csv', 'RFScore/*.csv']},
     )
