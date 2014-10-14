@@ -1,7 +1,14 @@
 import numpy as np
 from scipy.stats import linregress
-from sklearn.cross_validation import cross_val_score
+from sklearn.cross_validation import cross_val_score, KFold
 from sklearn.externals import joblib as pickle
+
+def cross_validate(model, cv_set, cv_target, n = 10, shuffle=True, n_jobs = 1):
+    if shuffle:
+        cv = KFold(len(cv_target), n_folds=n, shuffle=True)
+    else:
+        cv = n
+    return cross_val_score(model, cv_set, cv_target, cv = cv, n_jobs = n_jobs)
 
 ### FIX ### If possible make ensemble scorer lazy, for now it consumes all ligands
 class scorer(object):
@@ -79,15 +86,15 @@ class scorer(object):
                 else:
                     desc.protein = protein
     
-    def cross_validate(self, n = 10, test_set = None, test_target = None, n_jobs = 1):
+    def cross_validate(self, n = 10, test_set = None, test_target = None, *args, **kwargs):
         if test_set and test_target:
             cv_set = np.vstack((self.train_descs, self.test_descs, test_set))
             cv_target = np.hstack((self.train_target.flatten(), self.test_target.flatten(), test_target.flatten()))
         else:
             cv_set = np.vstack((self.train_descs, self.test_descs))
             cv_target = np.hstack((self.train_target.flatten(), self.test_target.flatten()))
-        return cross_val_score(self.model, cv_set, cv_target, cv = n, n_jobs = n_jobs)
-        
+        return cross_validate(self.model, cv_set, cv_target, cv = n, *args, **kwargs)
+    
     def save(self, filename):
         self.protein = None
         if self.single_descriptor:
