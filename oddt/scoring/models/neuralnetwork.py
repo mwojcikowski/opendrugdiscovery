@@ -7,7 +7,7 @@ import numpy as np
 from scipy.stats import linregress
 from sklearn.preprocessing import StandardScaler
 
-class neuralnetwork:
+class neuralnetwork(object):
     def __init__(self, shape = None, full_conn=True, biases=True, random_weights = True, normalize=True, reduce_empty_dims=True):
         """
         shape: shape of a NN given as a tuple
