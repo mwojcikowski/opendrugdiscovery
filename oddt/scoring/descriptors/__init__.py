@@ -85,6 +85,9 @@ class close_contacts(object):
                 desc = np.array([(distance(atoms_by_type(protein.atom_dict, [prot_type], self.mode)[prot_type]['coords'], atoms_by_type(mol.atom_dict, [mol_type], self.mode)[mol_type]['coords']) <= self.cutoff).sum() for mol_type in self.ligand_types for prot_type in self.protein_types], dtype=int)
             out = np.vstack((out, desc))
         return out[1:]
+    
+    def __reduce__(self):
+        return close_contacts, ()
         
 class fingerprints(object):
     def __init__(self, fp = 'fp2', toolkit = 'ob'):
@@ -112,3 +115,6 @@ class fingerprints(object):
                 out = np.zeros_like(fp)
             out = np.vstack((fp, out))
         return out[1:]
+    
+    def __reduce__(self):
+        return fingerprints, ()
